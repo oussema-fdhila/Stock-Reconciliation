@@ -331,26 +331,75 @@ def exporter_csv_redresse(df: pd.DataFrame, entete: list[str]) -> bytes:
 # MOUVEMENTS (FMALS032)
 # ==============================================================================
 
-def _parse_mouvements(contenu: bytes, nom: str) -> dict:
-    """Lecture + nettoyage + redressement CW automatique (uniquement si du CW est détecté)."""
-    df, entete = lire_csv_bytes(contenu, LIGNES_A_IGNORER_MOUVEMENTS, nom)
-    nb_lues = len(df)
-    df = nettoyer_df(df)
-
-    # Vérification immédiate : l'erreur apparaît dès le dépôt, pas au moment du calcul
-    manquantes = [c for c in ("PartNr.", "BookType", "Quantity", "Type") if c not in df.columns]
-    if manquantes:
-        raise ValueError(
-            f"{nom} : colonnes manquantes {manquantes}. Est-ce bien un fichier de mouvements FMALS032 ?"
+def _scanner_cw(contenu: bytes, nom: str) -> tuple[int, int, list[str]]:
+    """Compte les CW en ne chargeant que I et M, sans garder le DataFrame en mémoire."""
+    df, entete = lire_csv_bytes(
+        contenu, LIGNES_A_IGNORER_MOUVEMENTS, nom, usecols=[POS_I, POS_M]
+    )
+    if df.shape[1] != 2:
+        raise ValueError(f"{nom} : impossible de lire les colonnes I et M pour contrôler le CW.")
+    # Les deux colonnes sélectionnées sont réordonnées en I puis M par pandas.
+    for i in range(2):
+        df.iloc[:, i] = (
+            df.iloc[:, i].astype(str).str.replace("\xa0", " ", regex=False).str.strip()
         )
+    nb_cw = int((df.iloc[:, 0].isin(VALEURS_CW) | df.iloc[:, 1].isin(VALEURS_CW)).sum())
+    nb_lues = len(df)
+    del df
+    return nb_lues, nb_cw, entete
+
+
+def _parse_mouvements(contenu: bytes, nom: str) -> dict:
+    """Analyse en deux passes : charge seulement 5 colonnes si aucun CW n'est présent."""
+    nb_lues, nb_cw, entete = _scanner_cw(contenu, nom)
     if nb_lues == 0:
         raise ValueError(f"{nom} : aucune ligne de mouvement.")
 
-    nb_cw = compter_cw(df)
-    redresse, stats = False, None
+    redresse, stats, csv_redresse = False, None, None
     if nb_cw > 0:
+        # Le redressement CW dépend des positions G, I, L et M : charger toutes les colonnes
+        # uniquement si nécessaire, puis sauvegarder l'export avant de réduire le DataFrame.
+        df, _ = lire_csv_bytes(contenu, LIGNES_A_IGNORER_MOUVEMENTS, nom)
+        df = nettoyer_df(df)
+        manquantes = [c for c in ("PartNr.", "BookType", "Quantity", "Type") if c not in df.columns]
+        if manquantes:
+            raise ValueError(
+                f"{nom} : colonnes manquantes {manquantes}. Est-ce bien un fichier FMALS032 ?"
+            )
         df, stats = redresser_cw(df)
+        csv_redresse = exporter_csv_redresse(df, entete)
         redresse = True
+        # Les 25+ colonnes ne sont plus nécessaires aux calculs après le redressement.
+        # Garder uniquement les 5 colonnes utilisées par les magasins et le TCD.
+        noms_utiles = ("PartNr.", "BookType", "Warehouse", "Quantity", "Type")
+        manquantes_utiles = [c for c in noms_utiles if c not in df.columns]
+        if manquantes_utiles:
+            raise ValueError(f"{nom} : colonnes utiles absentes après CW : {manquantes_utiles}")
+        df = df.loc[:, list(noms_utiles)].copy()
+        gc.collect()
+    else:
+        # Sans CW, les colonnes descriptives ne servent ni à la réconciliation ni au TCD.
+        # Sélection par position pour tolérer les espaces dans les en-têtes exportés.
+        df, _ = lire_csv_bytes(
+            contenu, LIGNES_A_IGNORER_MOUVEMENTS, nom,
+            usecols=[2, 6, 8, 10, 11],
+        )
+        if df.shape[1] != 5:
+            raise ValueError(f"{nom} : structure inattendue, 5 colonnes utiles attendues.")
+        noms = [str(c).replace("\xa0", " ").replace("\ufeff", "").strip() for c in df.columns]
+        df.columns = noms
+        # Le rapport peut contenir des espaces en fin de nom (ex. 'BookType ').
+        mapping = {}
+        for idx, canonical in zip(range(5), ("PartNr.", "BookType", "Warehouse", "Quantity", "Type")):
+            mapping[df.columns[idx]] = canonical
+        df.rename(columns=mapping, inplace=True)
+        manquantes = [c for c in ("PartNr.", "BookType", "Quantity", "Type", "Warehouse") if c not in df.columns]
+        if manquantes:
+            raise ValueError(
+                f"{nom} : colonnes utiles introuvables {manquantes}. Vérifier la structure FMALS032."
+            )
+        for col in ("PartNr.", "BookType", "Warehouse", "Quantity", "Type"):
+            df[col] = df[col].astype(str).str.replace("\xa0", " ", regex=False).str.strip()
 
     return {
         "nom": nom,
@@ -360,6 +409,7 @@ def _parse_mouvements(contenu: bytes, nom: str) -> dict:
         "nb_cw": nb_cw,
         "redresse": redresse,
         "stats": stats,
+        "csv_redresse": csv_redresse,
     }
 
 
@@ -574,7 +624,7 @@ def calculer(plant: str, df_si, nom_si: str, df_sf, nom_sf: str, mouvs: list[dic
             "Lignes retenues": len(df),
         })
         if m["redresse"]:
-            csv_redresses.append((m["nom"], exporter_csv_redresse(m["df"], m["entete"])))
+            csv_redresses.append((m["nom"], m["csv_redresse"]))
 
     inconnus_all = pd.concat(inconnus_liste, ignore_index=True) if inconnus_liste else pd.DataFrame()
     rec = reconcilier(df_si, df_sf, tcds)
