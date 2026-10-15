@@ -5,7 +5,7 @@ Réconciliation de stock LEONI — application Streamlit
     Stock final = Stock initial + Mouvements      ->      Écart = SF − SI − Mouvement
 
 Fonctionnement :
-  1. choix du plant (47, 48, 66, 77)  -> table des signes du plant
+  1. choix du plant (29, 47, 48, 66, 77)  -> table des signes du plant
   2. dépôt du stock initial et du stock final (FMALS015)
   3. dépôt de 1 ou 2 fichiers de mouvements (FMALS032)
      - le redressement CW est détecté et appliqué automatiquement, fichier par fichier
@@ -40,7 +40,7 @@ POS_G, POS_I, POS_L, POS_M = 6, 8, 11, 12   # BookType, Warehouse, Type, by ware
 # Signe appliqué à un type de mouvement absent de la table du plant
 SIGNE_PAR_DEFAUT = 0
 
-PLANTS = ["47", "48", "66", "77"]
+PLANTS = ["29", "47", "48", "66", "77"]
 
 # Table des signes par plant : clé = "<BookType>_<Type>", valeur = +1 / -1 / 0
 SIGNES_PAR_PLANT = {
@@ -74,6 +74,43 @@ SIGNES_PAR_PLANT = {
         "72_DESPATCHED": 0,
         "6_RECEIPT": 0,
         "2_CANCELED": 0,
+    },
+    "29": {
+        "1_RECEIPT": 1,
+        "12_DESPATCHED": -1,
+        "13_DESPATCHED": -1,
+        "16_DESPATCHED": 0,
+        "17_CANCELED": 1,
+        "17_DESPATCHED": -1,
+        "2_RECEIPT": 0,
+        "23_DESPATCHED": -1,
+        "24_CANCELED": 1,
+        "24_RECEIPT": 1,
+        "28_UM V": 0,
+        "30_RECEIPT": 1,
+        "4_UM V": 0,
+        "41_DESPATCHED": -1,
+        "5_CANCELED": 1,
+        "5_RECEIPT": 1,
+        "1_CANCELED": 1,
+        "16_CANCELED": 0,
+        "23_": 0,
+        "23_CANCELED": 1,
+        "4_": 0,
+        "41_CANCELED": 1,
+        "13_CANCELED": 1,
+        "37_DESPATCHED": -1,
+        "42_UM V": 0,
+        "36_UM V": 0,
+        "20_DESPATCHED": 0,
+        "2_": 0,
+        "71_RECEIPT": 0,
+        "72_DESPATCHED": 0,
+        "20_RECEIPT": 0,
+        "21_DESPATCHED": 0,
+        "21_RECEIPT": 0,
+        "28_ 00 00 00 17": 0,
+        "28_6000": 0,
     },
     "48": {
         "1_RECEIPT": 1,
@@ -925,7 +962,7 @@ HERO = (
     '<h1>Réconciliation<br>de <em>stock</em></h1>'
     '<p>Contrôlez les mouvements, identifiez les écarts et sécurisez la réconciliation par plant, en quelques clics.</p>'
     '<span class="formule">ÉCART = STOCK FINAL − STOCK INITIAL − MOUVEMENTS</span>'
-    '<div class="hero-badges"><span>4 plants</span><span>Redressement CW auto</span>'
+    '<div class="hero-badges"><span>5 plants</span><span>Redressement CW auto</span>'
     '<span>Signes modifiables</span><span>Export Excel</span></div>'
     '</div>'
     '<div class="flow"><div class="title">FLUX DE RÉCONCILIATION</div>'
