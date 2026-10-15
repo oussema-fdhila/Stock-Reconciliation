@@ -750,7 +750,12 @@ CSS = """
   --ink:#102B50; --muted:#647995; --line:#DCE6F2; --paper:#EEF3F9;
   --ok:#12B76A; --bad:#F04438;
 }
-html, body, .stApp, [class*="st-"] {font-family:'Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',sans-serif;}
+html, body, .stApp, .stApp p, .stApp label, .stApp li, .stApp h1, .stApp h2, .stApp h3, .stApp h4,
+.stApp button, .stApp input, .stApp textarea, .stApp summary, .stApp small {font-family:'Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',sans-serif;}
+/* Les icônes Streamlit (upload, flèches…) doivent garder leur police d'icônes */
+[data-testid="stIconMaterial"], span[class*="material-symbols"], .material-icons, .material-symbols-rounded, .material-symbols-outlined {
+  font-family:'Material Symbols Rounded','Material Symbols Outlined','Material Icons' !important;
+  font-feature-settings:'liga'; font-style:normal; letter-spacing:normal; text-transform:none;}
 .stApp {
   color:var(--ink);
   background:
