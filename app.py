@@ -739,86 +739,19 @@ def construire_excel(rec, tcds, params, inconnus, orphelins) -> bytes:
 
 CSS = """
 <style>
-:root {
-  --leoni-navy: #002857;
-  --leoni-orange: #FF7514;
-  --leoni-blue: #0756A5;
-  --leoni-ink: #18283D;
-  --leoni-muted: #65758B;
-  --leoni-border: #DCE4EE;
-  --leoni-soft: #F3F6FA;
-}
-/* Page background and content width */
-.stApp { background: #F6F8FB; color: var(--leoni-ink); }
-.block-container { padding-top: 1.6rem; padding-bottom: 3rem; max-width: 1500px; }
-[data-testid="stHeader"] { background: rgba(246,248,251,.92); }
-/* LEONI-inspired hero */
-.hero {
-  position: relative; overflow: hidden;
-  background: linear-gradient(118deg, #002857 0%, #073D78 68%, #0756A5 100%);
-  padding: 1.9rem 2.1rem 1.7rem; border-radius: 18px;
-  margin: .15rem 0 1.5rem; box-shadow: 0 10px 28px rgba(0,40,87,.16);
-  border-bottom: 5px solid #FF7514;
-}
-.hero:after { content: ""; position: absolute; right: -42px; top: -72px; width: 230px; height: 230px;
-  border: 30px solid rgba(255,117,20,.18); border-radius: 50%; pointer-events: none; }
-.hero .eyebrow { color: #FFB27B; font-size: .74rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; margin: 0 0 .5rem; }
-.hero h1 { color: #fff; margin: 0; padding: 0; font-size: clamp(1.7rem, 3vw, 2.45rem); line-height: 1.15; font-weight: 800; letter-spacing: -.025em; }
-.hero p { color: rgba(255,255,255,.88); margin: .6rem 0 0; font-size: 1rem; max-width: 800px; line-height: 1.55; }
-.hero .formule { display: inline-flex; margin-top: 1rem; padding: .45rem .85rem; border-radius: 8px;
-  background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.25); color: #fff;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
-/* Sidebar */
-section[data-testid="stSidebar"] { background: #fff; border-right: 1px solid var(--leoni-border); }
-section[data-testid="stSidebar"] > div { padding-top: 1.3rem; }
-section[data-testid="stSidebar"] h3 { color: var(--leoni-navy); font-weight: 800; }
-section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: #43546A; line-height: 1.55; }
-/* Section cards */
-div[data-testid="stVerticalBlockBorderWrapper"] {
-  background: #fff; border: 1px solid var(--leoni-border); border-radius: 15px;
-  box-shadow: 0 3px 12px rgba(0,40,87,.035); padding: .2rem .15rem;
-}
-div[data-testid="stVerticalBlockBorderWrapper"] h4 { color: var(--leoni-navy); font-weight: 800; letter-spacing: -.01em; }
-/* Form controls */
-.stSelectbox label, .stFileUploader label, .stTextInput label, .stToggle label { color: var(--leoni-navy); font-weight: 650; }
-div[data-testid="stFileUploader"] section { background: #F8FAFD; border: 1.5px dashed #B8C8DC; border-radius: 12px; }
-div[data-testid="stFileUploader"] section:hover { border-color: var(--leoni-orange); background: #FFF9F4; }
-.stSelectbox [data-baseweb="select"] > div, .stTextInput input { border-radius: 9px; }
-/* Buttons */
-.stButton button, .stDownloadButton button { border-radius: 9px; font-weight: 700; transition: all .15s ease; }
-.stButton button[kind="primary"], .stDownloadButton button[kind="primary"] {
-  background: var(--leoni-orange); border: 1px solid var(--leoni-orange); color: #fff;
-}
-.stButton button[kind="primary"]:hover, .stDownloadButton button[kind="primary"]:hover {
-  background: #E96305; border-color: #E96305; color: #fff; box-shadow: 0 4px 12px rgba(255,117,20,.2);
-}
-.stButton button:not([kind="primary"]), .stDownloadButton button:not([kind="primary"]) { border-color: #C7D3E1; color: var(--leoni-navy); background: #fff; }
-/* Metrics */
-div[data-testid="stMetric"] { background: #fff; border: 1px solid var(--leoni-border); border-top: 3px solid var(--leoni-orange);
-  padding: .95rem 1rem; border-radius: 12px; box-shadow: 0 3px 12px rgba(0,40,87,.04); }
-div[data-testid="stMetricLabel"] { color: var(--leoni-muted); font-weight: 650; }
-div[data-testid="stMetricValue"] { color: var(--leoni-navy); font-weight: 800; }
-/* Tabs and data tables */
-button[data-baseweb="tab"] { color: #53647A; font-weight: 700; }
-button[data-baseweb="tab"][aria-selected="true"] { color: var(--leoni-navy); }
-div[data-baseweb="tab-highlight"] { background-color: var(--leoni-orange); }
-div[data-testid="stDataFrame"], div[data-testid="stDataEditor"] { border: 1px solid var(--leoni-border); border-radius: 10px; overflow: hidden; }
-.stAlert { border-radius: 10px; }
-hr { border-color: var(--leoni-border); }
-footer { visibility: hidden; }
-@media (max-width: 700px) {
-  .block-container { padding-top: 1rem; }
-  .hero { padding: 1.35rem 1.2rem; border-radius: 13px; }
-  .hero .formule { font-size: .74rem; white-space: normal; }
-}
+.hero{background:linear-gradient(135deg,#0f3d5e 0%,#1b6ca8 55%,#2aa6b8 100%);padding:1.6rem 2rem;border-radius:16px;margin-bottom:1.2rem;}
+.hero h1{color:#fff;margin:0;padding:0;font-size:2rem;line-height:1.2;}
+.hero p{color:rgba(255,255,255,.88);margin:.35rem 0 0 0;font-size:1rem;}
+.hero .formule{display:inline-block;margin-top:.8rem;padding:.25rem .8rem;border-radius:999px;background:rgba(255,255,255,.18);color:#fff;font-family:monospace;font-size:.9rem;}
+div[data-testid="stMetric"]{background:rgba(128,128,128,.08);border:1px solid rgba(128,128,128,.22);padding:.8rem 1rem;border-radius:12px;}
+footer{visibility:hidden;}
 </style>
 """
 
 HERO = (
     '<div class="hero">'
-    '<div class="eyebrow">LEONI · Supply Chain Management</div>'
-    "<h1>Réconciliation de stock</h1>"
-    "<p>Un contrôle clair et structuré des stocks et des mouvements pour identifier rapidement les écarts par article.</p>"
+    "<h1>📦 Réconciliation de stock</h1>"
+    "<p>Vérifiez article par article que le stock final correspond au stock initial et aux mouvements.</p>"
     '<span class="formule">Écart = Stock final − Stock initial − Mouvements</span>'
     "</div>"
 )
