@@ -184,48 +184,59 @@ SIGNES_PAR_PLANT = {
 # ==============================================================================
 
 def lire_csv_bytes(contenu: bytes, lignes_a_ignorer: int, nom: str = "fichier"):
-    """
-    Lit un CSV ';' depuis son contenu : supprime les octets NULL, met de côté les
-    premières lignes (en-tête du rapport) et lit le reste, dont la 1re ligne
-    contient les titres de colonnes.  Retourne (DataFrame, lignes_d_en_tete).
-    """
-    contenu = contenu.replace(b"\x00", b"")
-    texte = contenu.decode("latin1").replace("\r\n", "\n").replace("\r", "\n")
-    lignes = texte.split("\n")
+    """Lit un CSV volumineux sans créer plusieurs copies texte complètes en mémoire."""
+    # Un seul nettoyage binaire du fichier. Évite decode() + split() + join() sur
+    # l'intégralité d'un FMALS032 de 100 Mo ou plus.
+    contenu_propre = contenu.replace(b"\x00", b"")
 
-    if len(lignes) <= lignes_a_ignorer:
-        raise ValueError(f"{nom} : moins de {lignes_a_ignorer + 1} lignes, fichier inattendu.")
+    flux_entete = io.BytesIO(contenu_propre)
+    entete = []
+    for _ in range(lignes_a_ignorer):
+        ligne = flux_entete.readline()
+        if not ligne:
+            raise ValueError(
+                f"{nom} : moins de {lignes_a_ignorer + 1} lignes, fichier inattendu."
+            )
+        entete.append(ligne.decode("latin1").rstrip("\r\n"))
 
-    entete = lignes[:lignes_a_ignorer]
-    donnees = "\n".join(lignes[lignes_a_ignorer:])
-    if not donnees.strip():
+    try:
+        df = pd.read_csv(
+            io.BytesIO(contenu_propre),
+            sep=";",
+            skiprows=lignes_a_ignorer,
+            dtype=str,
+            keep_default_na=False,
+            encoding="latin1",
+            engine="c",
+            low_memory=True,
+        )
+    except pd.errors.EmptyDataError as exc:
+        raise ValueError(f"{nom} : aucune donnée après les {lignes_a_ignorer} premières lignes.") from exc
+
+    if df.empty and len(df.columns) == 0:
         raise ValueError(f"{nom} : aucune donnée après les {lignes_a_ignorer} premières lignes.")
-
-    df = pd.read_csv(io.StringIO(donnees), sep=";", dtype=str, keep_default_na=False)
     return df, entete
 
 
 def nettoyer_df(df: pd.DataFrame) -> pd.DataFrame:
-    """Nettoie les noms de colonnes et les valeurs (espaces, caractères invisibles)."""
-    df.columns = [
-        str(c).replace("\xa0", " ").replace("﻿", "").strip() for c in df.columns
-    ]
-    df = df.fillna("")
+    """Nettoie les en-têtes et uniquement les colonnes utiles au calcul/CW.
 
-    # Travail PAR POSITION : certains fichiers ont des noms de colonnes dupliqués
-    # après nettoyage (ex. "Type" et "Type "), et df[nom] renverrait alors un
-    # DataFrame au lieu d'une colonne.
-    noms = list(df.columns)
-    colonnes = [
-        df.iloc[:, i].astype(str)
-        .str.replace("\xa0", " ", regex=False)
-        .str.replace("﻿", "", regex=False)
-        .str.strip()
-        for i in range(df.shape[1])
+    Éviter de recopier et de nettoyer chaque cellule de fichiers de mouvements
+    de plusieurs millions de lignes réduit fortement le pic de mémoire.
+    """
+    df.columns = [
+        str(c).replace("\xa0", " ").replace("\ufeff", "").strip() for c in df.columns
     ]
-    propre = pd.concat(colonnes, axis=1)
-    propre.columns = noms
-    return propre.replace("nan", "")
+
+    indices_utiles = {POS_G, POS_I, POS_L, POS_M}
+    for nom_col in ("PartNr.", "BookType", "Quantity", "Type", "Warehouse"):
+        # Nettoyer toutes les occurrences d'un nom, si un export contient des doublons.
+        indices_utiles.update(i for i, c in enumerate(df.columns) if c == nom_col)
+    for i in sorted(i for i in indices_utiles if 0 <= i < df.shape[1]):
+        serie = df.iloc[:, i].astype(str)
+        serie = serie.str.replace("\xa0", " ", regex=False).str.replace("\ufeff", "", regex=False).str.strip()
+        df.iloc[:, i] = serie
+    return df
 
 
 def en_nombre(serie: pd.Series) -> pd.Series:
@@ -461,13 +472,13 @@ def _parse_stock(contenu: bytes, nom: str) -> pd.DataFrame:
 
 
 # Les fichiers sont lus une seule fois par contenu : changer une case à cocher ne relit rien.
-# Le cache est en mémoire (rien n'est écrit sur disque) et expire après 1 h.
-@st.cache_resource(show_spinner=False, ttl=3600, max_entries=6)
+# Le cache est limité aux derniers fichiers et expire après 15 minutes.
+@st.cache_resource(show_spinner=False, ttl=900, max_entries=2)
 def parse_mouvements(contenu: bytes, nom: str) -> dict:
     return _parse_mouvements(contenu, nom)
 
 
-@st.cache_resource(show_spinner=False, ttl=3600, max_entries=6)
+@st.cache_resource(show_spinner=False, ttl=900, max_entries=2)
 def parse_stock(contenu: bytes, nom: str) -> pd.DataFrame:
     return _parse_stock(contenu, nom)
 
@@ -838,7 +849,7 @@ def main():
         st.divider()
         st.caption(
             "Les fichiers sont traités en mémoire : rien n'est écrit sur disque. "
-            "Le cache mémoire expire après 1 heure."
+            "Le cache mémoire expire après 15 minutes et ne conserve que les derniers fichiers."
         )
 
     # ---------------------------------------------------------------- 1. PLANT
