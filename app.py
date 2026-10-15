@@ -744,14 +744,14 @@ CSS = """
   --ink:#102B50; --muted:#647995; --line:#D8E3F0; --paper:#F3F6FA;
 }
 .stApp {background:var(--paper); color:var(--ink);}
-.block-container {max-width:1480px; padding-top:1.15rem; padding-bottom:3rem;}
+.block-container {max-width:1540px; padding-top:.8rem; padding-bottom:2rem;}
 [data-testid="stHeader"] {background:rgba(243,246,250,.92);}
 [data-testid="stToolbar"] {right:1rem;}
 /* A compact, product-like hero */
 .hero {
  position:relative; overflow:hidden; display:flex; justify-content:space-between; gap:2rem;
  background:linear-gradient(112deg,#061D39 0%,#082C54 68%,#0B477C 100%);
- padding:1.7rem 2rem 1.5rem; border-radius:18px; margin:.2rem 0 1.25rem;
+ padding:1.35rem 1.7rem 1.2rem; border-radius:16px; margin:.1rem 0 .9rem;
  box-shadow:0 14px 32px rgba(6,29,57,.13); border-bottom:4px solid var(--orange);
 }
 .hero:before {content:""; position:absolute; right:5%; top:-205px; width:360px; height:360px;
@@ -777,16 +777,37 @@ section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {color:#C1D2
 section[data-testid="stSidebar"] hr {border-color:#284969;}
 /* Section containers */
 div[data-testid="stVerticalBlockBorderWrapper"] {background:#fff;border:1px solid var(--line);border-radius:14px;
- box-shadow:0 5px 18px rgba(6,29,57,.035);padding:.35rem .3rem;}
+ box-shadow:0 5px 18px rgba(6,29,57,.035);padding:.45rem .55rem;}
 div[data-testid="stVerticalBlockBorderWrapper"] h3,
 div[data-testid="stVerticalBlockBorderWrapper"] h4 {color:var(--navy);font-weight:800;letter-spacing:-.02em;}
 h2,h3,h4 {color:var(--navy);}
 p, label {color:var(--ink);}
 [data-testid="stCaptionContainer"] {color:var(--muted);}
 .stSelectbox label,.stFileUploader label,.stTextInput label,.stToggle label {color:var(--ink);font-weight:700;}
-div[data-testid="stFileUploader"] section {background:#F8FAFD;border:1.5px dashed #B8CBE1;border-radius:11px;transition:.18s;}
-div[data-testid="stFileUploader"] section:hover {border-color:var(--orange);background:#FFF8F2;}
-div[data-testid="stFileUploader"] button {border-radius:7px;font-weight:700;}
+div[data-testid="stFileUploader"] section {background:#F8FAFD !important;border:1.5px dashed #B8CBE1 !important;border-radius:11px;transition:.18s;padding:.75rem 1rem;}
+div[data-testid="stFileUploader"] section:hover {border-color:var(--orange) !important;background:#FFF8F2 !important;}
+/* File uploader: override Streamlit theme so upload actions stay readable */
+div[data-testid="stFileUploader"] button,
+div[data-testid="stFileUploader"] button[kind],
+div[data-testid="stFileUploader"] section button {
+  background:#FFFFFF !important; color:#082B52 !important;
+  border:1px solid #C4D3E5 !important; border-radius:8px !important;
+  font-weight:750 !important; box-shadow:none !important; opacity:1 !important;
+}
+div[data-testid="stFileUploader"] button:hover,
+div[data-testid="stFileUploader"] section button:hover {
+  background:#FFF4EA !important; border-color:#FF7514 !important; color:#082B52 !important;
+}
+div[data-testid="stFileUploader"] button svg {fill:#082B52 !important; color:#082B52 !important;}
+div[data-testid="stFileUploader"] small {color:#647995 !important;}
+div[data-testid="stFileUploader"] [data-testid="stMarkdownContainer"] p {color:#647995 !important;}
+/* Reduce Streamlit's oversized vertical rhythm */
+[data-testid="stVerticalBlock"] {gap:.85rem;}
+div[data-testid="stVerticalBlockBorderWrapper"] {padding:.65rem .7rem; margin-bottom:.25rem;}
+div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"] {gap:.65rem;}
+.stSelectbox [data-baseweb="select"] > div {min-height:2.65rem;}
+.stFileUploader label {font-size:.92rem !important;}
+
 .stSelectbox [data-baseweb="select"] > div,.stTextInput input {border-radius:9px;border-color:#CBD8E8;}
 /* Actions */
 .stButton button,.stDownloadButton button {border-radius:9px;font-weight:750;min-height:2.6rem;transition:all .15s ease;}
