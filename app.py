@@ -17,6 +17,7 @@ l'interface est dans main() tout en bas du fichier.
 """
 from __future__ import annotations
 
+import gc
 import io
 import re
 from datetime import datetime, timezone
@@ -183,11 +184,12 @@ SIGNES_PAR_PLANT = {
 # LECTURE ET NETTOYAGE DES FICHIERS
 # ==============================================================================
 
-def lire_csv_bytes(contenu: bytes, lignes_a_ignorer: int, nom: str = "fichier"):
+def lire_csv_bytes(contenu: bytes, lignes_a_ignorer: int, nom: str = "fichier", usecols=None):
     """Lit un CSV volumineux sans créer plusieurs copies texte complètes en mémoire."""
     # Un seul nettoyage binaire du fichier. Évite decode() + split() + join() sur
     # l'intégralité d'un FMALS032 de 100 Mo ou plus.
-    contenu_propre = contenu.replace(b"\x00", b"")
+    # Ne crée une copie complète du fichier que si des octets NUL sont réellement présents.
+    contenu_propre = contenu if b"\x00" not in contenu else contenu.replace(b"\x00", b"")
 
     flux_entete = io.BytesIO(contenu_propre)
     entete = []
@@ -209,6 +211,7 @@ def lire_csv_bytes(contenu: bytes, lignes_a_ignorer: int, nom: str = "fichier"):
             encoding="latin1",
             engine="c",
             low_memory=True,
+            usecols=usecols,
         )
     except pd.errors.EmptyDataError as exc:
         raise ValueError(f"{nom} : aucune donnée après les {lignes_a_ignorer} premières lignes.") from exc
@@ -454,7 +457,9 @@ def creer_tcd(df: pd.DataFrame, signes: dict, nom: str):
 # ==============================================================================
 
 def _parse_stock(contenu: bytes, nom: str) -> pd.DataFrame:
-    df, _ = lire_csv_bytes(contenu, LIGNES_A_IGNORER_STOCK, nom)
+    # Pour FMALS015, le calcul utilise uniquement les colonnes A, D, G et J.
+    # Lire seulement A:J réduit fortement la mémoire pour les fichiers de stock.
+    df, _ = lire_csv_bytes(contenu, LIGNES_A_IGNORER_STOCK, nom, usecols=range(10))
     df = nettoyer_df(df)
     if df.shape[1] < 10:
         raise ValueError(
@@ -594,7 +599,10 @@ def calculer(plant: str, df_si, nom_si: str, df_sf, nom_sf: str, mouvs: list[dic
     }
     controle_df = pd.DataFrame(controle)
 
-    return {
+    # Construire le fichier Excel une seule fois ; le résultat conserve uniquement
+    # les objets nécessaires à l'affichage et aux boutons de téléchargement.
+    excel_bytes = construire_excel(rec, tcds, params, inconnus_all, orphelins)
+    resultat = {
         "plant": plant,
         "df": rec,
         "tcds": tcds,
@@ -605,9 +613,14 @@ def calculer(plant: str, df_si, nom_si: str, df_sf, nom_sf: str, mouvs: list[dic
         "magasins_supprimes": magasins_supprimes,
         "csv_redresses": csv_redresses,
         "params": params,
-        "excel": construire_excel(rec, tcds, params, inconnus_all, orphelins),
+        "excel": excel_bytes,
         "nom_excel": f"Reconciliation_Plant{plant}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.xlsx",
     }
+
+    # Libérer les objets intermédiaires locaux dès qu'ils ne sont plus nécessaires.
+    del controle, controle_df, excel_bytes, inconnus_liste, libelles, params, rec, orphelins
+    gc.collect()
+    return resultat
 
 
 # ==============================================================================
@@ -849,7 +862,8 @@ def main():
         st.divider()
         st.caption(
             "Les fichiers sont traités en mémoire : rien n'est écrit sur disque. "
-            "Le cache mémoire expire après 15 minutes et ne conserve que les derniers fichiers."
+            "Le cache des fichiers analysés expire après 15 minutes (2 entrées maximum par type). "
+            "Les résultats restent en mémoire pour permettre l'affichage et le téléchargement."
         )
 
     # ---------------------------------------------------------------- 1. PLANT
@@ -993,6 +1007,10 @@ def main():
                 df_si = parse_stock(f_si.getvalue(), f_si.name)
                 df_sf = parse_stock(f_sf.getvalue(), f_sf.name)
                 res = calculer(plant, df_si, f_si.name, df_sf, f_sf.name, mouvs, codes, libelles)
+                # Les DataFrames de stock ne sont plus nécessaires localement :
+                # les résultats requis restent dans res pour l'affichage et l'export.
+                del df_si, df_sf
+                gc.collect()
             res["signature"] = signature
             st.session_state["res"] = res
         except Exception as e:
