@@ -739,21 +739,68 @@ def construire_excel(rec, tcds, params, inconnus, orphelins) -> bytes:
 
 CSS = """
 <style>
-.hero{background:linear-gradient(135deg,#0f3d5e 0%,#1b6ca8 55%,#2aa6b8 100%);padding:1.6rem 2rem;border-radius:16px;margin-bottom:1.2rem;}
-.hero h1{color:#fff;margin:0;padding:0;font-size:2rem;line-height:1.2;}
-.hero p{color:rgba(255,255,255,.88);margin:.35rem 0 0 0;font-size:1rem;}
-.hero .formule{display:inline-block;margin-top:.8rem;padding:.25rem .8rem;border-radius:999px;background:rgba(255,255,255,.18);color:#fff;font-family:monospace;font-size:.9rem;}
-div[data-testid="stMetric"]{background:rgba(128,128,128,.08);border:1px solid rgba(128,128,128,.22);padding:.8rem 1rem;border-radius:12px;}
-footer{visibility:hidden;}
+:root{--navy:#002857;--navy2:#073d78;--orange:#ff7514;--ink:#17283f;--muted:#6d7c91;--line:#dce5ef;--paper:#f4f7fb;--white:#fff}
+.stApp{background:radial-gradient(ellipse at 88% 0%,rgba(255,117,20,.055),transparent 28%),var(--paper);color:var(--ink)}
+.block-container{max-width:1460px;padding-top:1.1rem;padding-bottom:4rem}
+[data-testid="stHeader"]{background:rgba(244,247,251,.86)}
+#MainMenu,footer{visibility:hidden}
+/* Brand-led editorial hero */
+.hero{position:relative;isolation:isolate;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:2rem;min-height:228px;padding:2.1rem 2.4rem;margin:.25rem 0 1.6rem;border-radius:24px;background:linear-gradient(115deg,#001b3b 0%,#002857 52%,#084985 100%);box-shadow:0 18px 44px rgba(0,40,87,.16);color:white}
+.hero:before{content:"";position:absolute;z-index:-1;width:330px;height:330px;right:8%;top:-190px;border:1px solid rgba(255,255,255,.17);border-radius:50%;box-shadow:0 0 0 32px rgba(255,255,255,.025),0 0 0 66px rgba(255,255,255,.025),0 0 0 100px rgba(255,255,255,.02)}
+.hero:after{content:"";position:absolute;z-index:-1;left:0;bottom:0;width:38%;height:5px;background:linear-gradient(90deg,var(--orange),#ffb16f,transparent)}
+.hero-main{max-width:760px}.hero .eyebrow{display:flex;align-items:center;gap:.55rem;color:#ffc18f;font-size:.72rem;font-weight:800;letter-spacing:.17em;text-transform:uppercase;margin:0 0 1rem}.hero .eyebrow:before{content:"";width:23px;height:3px;background:var(--orange);border-radius:4px}
+.hero h1{color:#fff;margin:0;padding:0;font-size:clamp(2rem,3.6vw,3.15rem);font-weight:800;letter-spacing:-.055em;line-height:1.04}.hero p{max-width:680px;color:#d9e5f2;font-size:1rem;line-height:1.65;margin:.9rem 0 0}.hero .formula{display:inline-flex;align-items:center;gap:.5rem;margin-top:1.2rem;padding:.6rem .85rem;border:1px solid rgba(255,255,255,.18);border-radius:9px;background:rgba(255,255,255,.07);font:600 .79rem ui-monospace,SFMono-Regular,Menlo,monospace;color:#fff}.hero .hero-side{flex:0 0 180px;align-self:stretch;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;text-align:right}.hero .side-kicker{font-size:.65rem;letter-spacing:.19em;text-transform:uppercase;color:#9db6d2;font-weight:800}.hero .side-number{font-size:5.3rem;line-height:.95;font-weight:850;letter-spacing:-.09em;color:rgba(255,255,255,.94)}.hero .side-number span{color:var(--orange)}.hero .side-label{margin-top:.65rem;font-size:.78rem;color:#c6d6e8;max-width:130px}
+/* Sidebar as control room */
+section[data-testid="stSidebar"]{background:#fff;border-right:1px solid var(--line)}
+section[data-testid="stSidebar"]>div{padding-top:1.35rem}
+section[data-testid="stSidebar"] h3{color:var(--navy);font-weight:800;letter-spacing:-.025em}
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{color:#52647a;line-height:1.6;font-size:.9rem}
+section[data-testid="stSidebar"] hr{border-color:#e5ebf3}
+.workflow-kicker{margin:.3rem 0 .8rem;color:#7a8aa0;font-size:.69rem;font-weight:850;letter-spacing:.18em}
+/* Main workflow cards */
+div[data-testid="stVerticalBlockBorderWrapper"]{background:rgba(255,255,255,.94);border:1px solid #e0e7f0;border-radius:17px;box-shadow:0 6px 22px rgba(0,40,87,.035);padding:.35rem .35rem;transition:border-color .2s,box-shadow .2s}
+div[data-testid="stVerticalBlockBorderWrapper"]:hover{border-color:#c8d6e6;box-shadow:0 9px 27px rgba(0,40,87,.055)}
+div[data-testid="stVerticalBlockBorderWrapper"] h4{color:var(--navy);font-weight:800;font-size:1.06rem;letter-spacing:-.025em;padding-bottom:.55rem;border-bottom:1px solid #edf1f6}
+/* Inputs and drag-drop */
+.stSelectbox label,.stFileUploader label,.stTextInput label,.stToggle label{color:var(--navy);font-weight:700;font-size:.9rem}
+div[data-testid="stFileUploader"] section{background:linear-gradient(145deg,#fbfcfe,#f5f8fc);border:1.5px dashed #b9c9dc;border-radius:13px;transition:all .18s}
+div[data-testid="stFileUploader"] section:hover{border-color:var(--orange);background:#fff8f2}
+.stSelectbox [data-baseweb="select"]>div,.stTextInput input{border-radius:10px;border-color:#d6e0ec}
+/* Buttons with deliberate hierarchy */
+.stButton button,.stDownloadButton button{border-radius:10px!important;font-weight:750!important;min-height:2.7rem;transition:transform .16s,box-shadow .16s,background .16s}
+.stButton button[kind="primary"],.stDownloadButton button[kind="primary"]{background:var(--orange)!important;border:1px solid var(--orange)!important;color:#fff!important;box-shadow:0 5px 12px rgba(255,117,20,.17)}
+.stButton button[kind="primary"]:hover,.stDownloadButton button[kind="primary"]:hover{background:#e96205!important;border-color:#e96205!important;transform:translateY(-1px);box-shadow:0 8px 18px rgba(255,117,20,.24)}
+.stButton button:not([kind="primary"]),.stDownloadButton button:not([kind="primary"]){border:1px solid #cfdae7;color:var(--navy);background:#fff}
+/* Result metrics: dashboard tiles */
+div[data-testid="stMetric"]{position:relative;overflow:hidden;background:#fff;border:1px solid #e1e8f1;border-radius:15px;padding:1rem 1rem .9rem;box-shadow:0 5px 18px rgba(0,40,87,.035)}
+div[data-testid="stMetric"]:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--orange)}
+div[data-testid="stMetricLabel"]{color:var(--muted);font-weight:700;font-size:.78rem}
+div[data-testid="stMetricValue"]{color:var(--navy);font-weight:850;letter-spacing:-.04em}
+/* Tabs, tables, alerts */
+button[data-baseweb="tab"]{color:#65758a;font-weight:750;padding-top:.8rem;padding-bottom:.8rem}
+button[data-baseweb="tab"][aria-selected="true"]{color:var(--navy)}
+div[data-baseweb="tab-highlight"]{background:var(--orange);height:3px}
+div[data-testid="stDataFrame"],div[data-testid="stDataEditor"]{border:1px solid #dfe7f0;border-radius:12px;overflow:hidden}
+.stAlert{border-radius:12px;border:1px solid #e4eaf2}
+hr{border-color:#e2e9f1}
+/* Primary run action */
+.stButton:has(button[kind="primary"]){padding-top:.35rem}
+@media(max-width:760px){.block-container{padding-top:.7rem}.hero{padding:1.5rem 1.3rem;min-height:0;border-radius:18px}.hero .hero-side{display:none}.hero h1{font-size:2rem}.hero p{font-size:.92rem}.hero .formula{font-size:.69rem;line-height:1.5;white-space:normal}div[data-testid="stVerticalBlockBorderWrapper"]{padding:.15rem}}
 </style>
 """
 
 HERO = (
     '<div class="hero">'
-    "<h1>📦 Réconciliation de stock</h1>"
-    "<p>Vérifiez article par article que le stock final correspond au stock initial et aux mouvements.</p>"
-    '<span class="formule">Écart = Stock final − Stock initial − Mouvements</span>'
-    "</div>"
+    '<div class="hero-main">'
+    '<div class="eyebrow">LEONI · Supply Chain Management</div>'
+    '<h1>Stock, sous contrôle.</h1>'
+    '<p>Une vision fiable des mouvements, des stocks et des écarts. Importez vos fichiers, contrôlez les paramètres, puis lancez une réconciliation traçable.</p>'
+    '<span class="formula">ÉCART = STOCK FINAL − STOCK INITIAL − MOUVEMENTS</span>'
+    '</div>'
+    '<div class="hero-side"><div class="side-kicker">Stock intelligence</div>'
+    '<div class="side-number">S<span>.</span></div>'
+    '<div class="side-label">Réconciliation & contrôle</div></div>'
+    '</div>'
 )
 
 
@@ -898,7 +945,7 @@ def main():
     st.markdown(HERO, unsafe_allow_html=True)
 
     with st.sidebar:
-        st.markdown("### Mode d'emploi")
+        st.markdown("### Centre de contrôle")
         st.markdown(
             "1. Choisissez le **plant**\n"
             "2. Déposez le **stock initial** et le **stock final** (FMALS015)\n"
@@ -915,6 +962,8 @@ def main():
             "Le cache des fichiers analysés expire après 15 minutes (2 entrées maximum par type). "
             "Les résultats restent en mémoire pour permettre l'affichage et le téléchargement."
         )
+
+    st.markdown('<div class="workflow-kicker">01 — CONFIGURER & IMPORTER</div>', unsafe_allow_html=True)
 
     # ---------------------------------------------------------------- 1. PLANT
     with st.container(border=True):
@@ -1026,6 +1075,8 @@ def main():
                     else:
                         st.caption("Aucun magasin coché : aucune ligne ne sera supprimée.")
 
+    st.markdown('<div class="workflow-kicker">02 — VALIDER & EXÉCUTER</div>', unsafe_allow_html=True)
+
     # ---------------------------------------------------------------- LANCEMENT
     manques = []
     if not plant:
@@ -1049,7 +1100,7 @@ def main():
             tuple(sorted(codes)),
         )
 
-    lancer = st.button("🚀 Lancer la réconciliation", type="primary", disabled=not pret)
+    lancer = st.button("LANCER LA RÉCONCILIATION  →", type="primary", disabled=not pret, use_container_width=True)
 
     if lancer and pret:
         try:
