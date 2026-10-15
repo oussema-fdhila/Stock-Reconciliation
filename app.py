@@ -601,9 +601,11 @@ def trouver_orphelins(df_rec: pd.DataFrame, tcds: list[pd.DataFrame], noms: list
 
 
 def calculer(plant: str, df_si, nom_si: str, df_sf, nom_sf: str, mouvs: list[dict], codes: set[str],
-             libelles_magasins: dict | None = None) -> dict:
-    """Calcul complet. Retourne un dictionnaire avec tous les résultats et le fichier Excel."""
-    signes = SIGNES_PAR_PLANT[plant]
+             libelles_magasins: dict | None = None, signes: dict | None = None) -> dict:
+    """Calcul complet. Retourne un dictionnaire avec tous les résultats et le fichier Excel.
+    `signes` : table des signes choisie dans l'application (sinon table par défaut du plant)."""
+    signes = dict(signes) if signes is not None else dict(SIGNES_PAR_PLANT[plant])
+    modifs = differences_signes(plant, signes)
     tcds, inconnus_liste, controle = [], [], []
     csv_redresses = []
 
@@ -645,6 +647,9 @@ def calculer(plant: str, df_si, nom_si: str, df_sf, nom_sf: str, mouvs: list[dic
         ),
         "Magasins supprimés": ", ".join(magasins_supprimes) if magasins_supprimes else "aucun",
         "Mouvements inconnus (signe 0)": int(len(inconnus_all)),
+        "Signes modifiés": (
+            ", ".join(f"{k}: {a} → {b}" for k, a, b in modifs) if modifs else "aucun (table par défaut)"
+        ),
         "Formule": "Ecart = SF - SI - Mouvement ; Ecart EUR = Ecart x PU",
     }
     controle_df = pd.DataFrame(controle)
@@ -868,6 +873,30 @@ def plant_dans_nom(nom: str):
     return m.group(1) if m else None
 
 
+def differences_signes(plant: str, signes: dict) -> list:
+    """Liste (mouvement, signe par défaut, signe choisi) pour les signes différents de la table du plant."""
+    defaut = SIGNES_PAR_PLANT[plant]
+    out = []
+    for k in sorted(set(defaut) | set(signes)):
+        a = defaut.get(k, SIGNE_PAR_DEFAUT)
+        b = signes.get(k, SIGNE_PAR_DEFAUT)
+        if a != b:
+            out.append((k, a, b))
+    return out
+
+
+def mouvements_presents(mouvs: list) -> pd.Series:
+    """Nombre de lignes par type de mouvement (BookType_Type) dans les fichiers déposés."""
+    total = pd.Series(dtype="int64")
+    for m in mouvs:
+        d = m["df"]
+        if "BookType" not in d.columns or "Type" not in d.columns:
+            continue
+        cle = d["BookType"].astype(str).str.replace(r"^0+(\d+)$", r"\1", regex=True) + "_" + d["Type"].astype(str)
+        total = total.add(cle.value_counts(), fill_value=0)
+    return total.astype("int64")
+
+
 def table_signes(plant: str) -> pd.DataFrame:
     signes = SIGNES_PAR_PLANT[plant]
     effet = {1: "Entrée (+)", -1: "Sortie (−)", 0: "Neutre (0)"}
@@ -999,12 +1028,13 @@ def main():
             "1. Choisissez le **plant**\n"
             "2. Déposez le **stock initial** et le **stock final** (FMALS015)\n"
             "3. Déposez **1 ou 2 fichiers de mouvements** (FMALS032)\n"
-            "4. Cochez les **magasins à supprimer** (si besoin)\n"
-            "5. Lancez la réconciliation et téléchargez l'Excel"
+            "4. Vérifiez / modifiez les **signes** (1, 0 ou −1) si nécessaire\n"
+            "5. Cochez les **magasins à supprimer** (si besoin)\n"
+            "6. Lancez la réconciliation et téléchargez l'Excel"
         )
         st.divider()
         st.markdown("**Redressement CW** : détecté et appliqué automatiquement, fichier par fichier.")
-        st.markdown("**Mouvement inconnu** : signe 0 (signalé dans l'onglet Contrôles).")
+        st.markdown("**Mouvement inconnu** : signe 0 par défaut (modifiable à l'étape 4, signalé dans l'onglet Contrôles).")
         st.divider()
         st.caption(
             "Les fichiers sont traités en mémoire : rien n'est écrit sur disque. "
@@ -1019,8 +1049,7 @@ def main():
             "Plant à réconcilier", PLANTS, index=None, placeholder="Choisir un plant…", key="plant"
         )
         if plant:
-            with st.expander(f"Voir la table des signes du plant {plant}"):
-                st.dataframe(table_signes(plant), hide_index=True)
+            st.caption("Les signes appliqués aux mouvements se consultent et se modifient à l'étape 4.")
         else:
             st.caption("Le plant détermine la table des signes appliquée aux mouvements.")
 
@@ -1073,11 +1102,65 @@ def main():
                         "aucun CW détecté → redressement non nécessaire"
                     )
 
-    # ---------------------------------------------------------------- 4. MAGASINS
+    # ---------------------------------------------------------------- 4. SIGNES
+    signes_choisis: dict = dict(SIGNES_PAR_PLANT[plant]) if plant else {}
+    with st.container(border=True):
+        st.markdown("#### 4 · Signes des mouvements")
+        if not plant:
+            st.caption("Choisissez d'abord le plant.")
+        else:
+            presents = mouvements_presents([m for m in mouvs]) if mouvs and not erreur_mouvements else pd.Series(dtype="int64")
+            defaut = SIGNES_PAR_PLANT[plant]
+            noms = list(defaut) + sorted(k for k in presents.index if k not in defaut)
+            base_s = pd.DataFrame({
+                "Mouvement": noms,
+                "Signe": [defaut.get(k, SIGNE_PAR_DEFAUT) for k in noms],
+                "Origine": ["Table du plant" if k in defaut else "Nouveau (hors table)" for k in noms],
+                "Lignes dans les fichiers": [int(presents.get(k, 0)) for k in noms],
+            })
+            n_reset = st.session_state.get("reset_signes", 0)
+            cle_s = f"signes_{plant}_{n_reset}_{len(noms)}"
+            with st.expander("Voir / modifier les signes (+1 entrée · −1 sortie · 0 neutre)", expanded=False):
+                st.caption(
+                    "Par défaut : table du plant. Changez le **Signe** d'un mouvement si nécessaire "
+                    "(1 = entrée, −1 = sortie, 0 = ignoré). Les mouvements « Nouveau (hors table) » "
+                    "présents dans vos fichiers sont ajoutés avec le signe 0."
+                )
+                edite_s = st.data_editor(
+                    base_s,
+                    key=cle_s,
+                    hide_index=True,
+                    disabled=["Mouvement", "Origine", "Lignes dans les fichiers"],
+                    column_config={
+                        "Signe": st.column_config.SelectboxColumn(
+                            "Signe", options=[-1, 0, 1], required=True,
+                            help="1 = entrée (+) · −1 = sortie (−) · 0 = neutre",
+                        ),
+                        "Lignes dans les fichiers": st.column_config.NumberColumn(format="%d"),
+                    },
+                )
+                signes_choisis = {
+                    str(k): int(v) for k, v in zip(edite_s["Mouvement"], edite_s["Signe"])
+                    if pd.notna(v)
+                }
+                if st.button("↩️ Rétablir la table par défaut", key="btn_reset_signes"):
+                    st.session_state["reset_signes"] = n_reset + 1
+                    st.rerun()
+            modifs = differences_signes(plant, signes_choisis)
+            if modifs:
+                st.warning(
+                    f"✏️ {len(modifs)} signe(s) modifié(s) par rapport à la table du plant : "
+                    + " · ".join(f"`{k}` : {a} → {b}" for k, a, b in modifs[:8])
+                    + (" …" if len(modifs) > 8 else "")
+                )
+            else:
+                st.caption("Table des signes par défaut du plant utilisée.")
+
+    # ---------------------------------------------------------------- 5. MAGASINS
     codes: set[str] = set()
     libelles: dict = {}
     with st.container(border=True):
-        st.markdown("#### 4 · Magasins à supprimer")
+        st.markdown("#### 5 · Magasins à supprimer")
         if not mouvs or erreur_mouvements:
             st.caption("La liste des magasins apparaît dès que les fichiers de mouvements sont chargés.")
         else:
@@ -1143,6 +1226,7 @@ def main():
             plant, _fid(f_si), _fid(f_sf),
             tuple(_fid(f) for f in sorted(f_mouv, key=lambda x: x.name)),
             tuple(sorted(codes)),
+            tuple(sorted(signes_choisis.items())),
         )
 
     lancer = st.button("🚀 Lancer la réconciliation", type="primary", disabled=not pret)
@@ -1152,7 +1236,8 @@ def main():
             with st.spinner("Calcul en cours…"):
                 df_si = parse_stock(f_si.getvalue(), f_si.name)
                 df_sf = parse_stock(f_sf.getvalue(), f_sf.name)
-                res = calculer(plant, df_si, f_si.name, df_sf, f_sf.name, mouvs, codes, libelles)
+                res = calculer(plant, df_si, f_si.name, df_sf, f_sf.name, mouvs, codes, libelles,
+                               signes=signes_choisis)
                 # Les DataFrames de stock ne sont plus nécessaires localement :
                 # les résultats requis restent dans res pour l'affichage et l'export.
                 del df_si, df_sf
