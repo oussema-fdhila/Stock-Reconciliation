@@ -739,69 +739,89 @@ def construire_excel(rec, tcds, params, inconnus, orphelins) -> bytes:
 
 CSS = """
 <style>
-:root{--navy:#002857;--navy2:#073d78;--orange:#ff7514;--ink:#17283f;--muted:#6d7c91;--line:#dce5ef;--paper:#f4f7fb;--white:#fff}
-.stApp{background:radial-gradient(ellipse at 88% 0%,rgba(255,117,20,.055),transparent 28%),var(--paper);color:var(--ink)}
-.block-container{max-width:1460px;padding-top:1.1rem;padding-bottom:4rem}
-[data-testid="stHeader"]{background:rgba(244,247,251,.86)}
-#MainMenu,footer{visibility:hidden}
-/* Brand-led editorial hero */
-.hero{position:relative;isolation:isolate;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:2rem;min-height:228px;padding:2.1rem 2.4rem;margin:.25rem 0 1.6rem;border-radius:24px;background:linear-gradient(115deg,#001b3b 0%,#002857 52%,#084985 100%);box-shadow:0 18px 44px rgba(0,40,87,.16);color:white}
-.hero:before{content:"";position:absolute;z-index:-1;width:330px;height:330px;right:8%;top:-190px;border:1px solid rgba(255,255,255,.17);border-radius:50%;box-shadow:0 0 0 32px rgba(255,255,255,.025),0 0 0 66px rgba(255,255,255,.025),0 0 0 100px rgba(255,255,255,.02)}
-.hero:after{content:"";position:absolute;z-index:-1;left:0;bottom:0;width:38%;height:5px;background:linear-gradient(90deg,var(--orange),#ffb16f,transparent)}
-.hero-main{max-width:760px}.hero .eyebrow{display:flex;align-items:center;gap:.55rem;color:#ffc18f;font-size:.72rem;font-weight:800;letter-spacing:.17em;text-transform:uppercase;margin:0 0 1rem}.hero .eyebrow:before{content:"";width:23px;height:3px;background:var(--orange);border-radius:4px}
-.hero h1{color:#fff;margin:0;padding:0;font-size:clamp(2rem,3.6vw,3.15rem);font-weight:800;letter-spacing:-.055em;line-height:1.04}.hero p{max-width:680px;color:#d9e5f2;font-size:1rem;line-height:1.65;margin:.9rem 0 0}.hero .formula{display:inline-flex;align-items:center;gap:.5rem;margin-top:1.2rem;padding:.6rem .85rem;border:1px solid rgba(255,255,255,.18);border-radius:9px;background:rgba(255,255,255,.07);font:600 .79rem ui-monospace,SFMono-Regular,Menlo,monospace;color:#fff}.hero .hero-side{flex:0 0 180px;align-self:stretch;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;text-align:right}.hero .side-kicker{font-size:.65rem;letter-spacing:.19em;text-transform:uppercase;color:#9db6d2;font-weight:800}.hero .side-number{font-size:5.3rem;line-height:.95;font-weight:850;letter-spacing:-.09em;color:rgba(255,255,255,.94)}.hero .side-number span{color:var(--orange)}.hero .side-label{margin-top:.65rem;font-size:.78rem;color:#c6d6e8;max-width:130px}
-/* Sidebar as control room */
-section[data-testid="stSidebar"]{background:#fff;border-right:1px solid var(--line)}
-section[data-testid="stSidebar"]>div{padding-top:1.35rem}
-section[data-testid="stSidebar"] h3{color:var(--navy);font-weight:800;letter-spacing:-.025em}
-section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{color:#52647a;line-height:1.6;font-size:.9rem}
-section[data-testid="stSidebar"] hr{border-color:#e5ebf3}
-.workflow-kicker{margin:.3rem 0 .8rem;color:#7a8aa0;font-size:.69rem;font-weight:850;letter-spacing:.18em}
-/* Main workflow cards */
-div[data-testid="stVerticalBlockBorderWrapper"]{background:rgba(255,255,255,.94);border:1px solid #e0e7f0;border-radius:17px;box-shadow:0 6px 22px rgba(0,40,87,.035);padding:.35rem .35rem;transition:border-color .2s,box-shadow .2s}
-div[data-testid="stVerticalBlockBorderWrapper"]:hover{border-color:#c8d6e6;box-shadow:0 9px 27px rgba(0,40,87,.055)}
-div[data-testid="stVerticalBlockBorderWrapper"] h4{color:var(--navy);font-weight:800;font-size:1.06rem;letter-spacing:-.025em;padding-bottom:.55rem;border-bottom:1px solid #edf1f6}
-/* Inputs and drag-drop */
-.stSelectbox label,.stFileUploader label,.stTextInput label,.stToggle label{color:var(--navy);font-weight:700;font-size:.9rem}
-div[data-testid="stFileUploader"] section{background:linear-gradient(145deg,#fbfcfe,#f5f8fc);border:1.5px dashed #b9c9dc;border-radius:13px;transition:all .18s}
-div[data-testid="stFileUploader"] section:hover{border-color:var(--orange);background:#fff8f2}
-.stSelectbox [data-baseweb="select"]>div,.stTextInput input{border-radius:10px;border-color:#d6e0ec}
-/* Buttons with deliberate hierarchy */
-.stButton button,.stDownloadButton button{border-radius:10px!important;font-weight:750!important;min-height:2.7rem;transition:transform .16s,box-shadow .16s,background .16s}
-.stButton button[kind="primary"],.stDownloadButton button[kind="primary"]{background:var(--orange)!important;border:1px solid var(--orange)!important;color:#fff!important;box-shadow:0 5px 12px rgba(255,117,20,.17)}
-.stButton button[kind="primary"]:hover,.stDownloadButton button[kind="primary"]:hover{background:#e96205!important;border-color:#e96205!important;transform:translateY(-1px);box-shadow:0 8px 18px rgba(255,117,20,.24)}
-.stButton button:not([kind="primary"]),.stDownloadButton button:not([kind="primary"]){border:1px solid #cfdae7;color:var(--navy);background:#fff}
-/* Result metrics: dashboard tiles */
-div[data-testid="stMetric"]{position:relative;overflow:hidden;background:#fff;border:1px solid #e1e8f1;border-radius:15px;padding:1rem 1rem .9rem;box-shadow:0 5px 18px rgba(0,40,87,.035)}
-div[data-testid="stMetric"]:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--orange)}
-div[data-testid="stMetricLabel"]{color:var(--muted);font-weight:700;font-size:.78rem}
-div[data-testid="stMetricValue"]{color:var(--navy);font-weight:850;letter-spacing:-.04em}
-/* Tabs, tables, alerts */
-button[data-baseweb="tab"]{color:#65758a;font-weight:750;padding-top:.8rem;padding-bottom:.8rem}
-button[data-baseweb="tab"][aria-selected="true"]{color:var(--navy)}
-div[data-baseweb="tab-highlight"]{background:var(--orange);height:3px}
-div[data-testid="stDataFrame"],div[data-testid="stDataEditor"]{border:1px solid #dfe7f0;border-radius:12px;overflow:hidden}
-.stAlert{border-radius:12px;border:1px solid #e4eaf2}
-hr{border-color:#e2e9f1}
-/* Primary run action */
-.stButton:has(button[kind="primary"]){padding-top:.35rem}
-@media(max-width:760px){.block-container{padding-top:.7rem}.hero{padding:1.5rem 1.3rem;min-height:0;border-radius:18px}.hero .hero-side{display:none}.hero h1{font-size:2rem}.hero p{font-size:.92rem}.hero .formula{font-size:.69rem;line-height:1.5;white-space:normal}div[data-testid="stVerticalBlockBorderWrapper"]{padding:.15rem}}
+:root {
+  --navy:#061D39; --navy2:#0A315D; --orange:#FF7514;
+  --ink:#102B50; --muted:#647995; --line:#D8E3F0; --paper:#F3F6FA;
+}
+.stApp {background:var(--paper); color:var(--ink);}
+.block-container {max-width:1480px; padding-top:1.15rem; padding-bottom:3rem;}
+[data-testid="stHeader"] {background:rgba(243,246,250,.92);}
+[data-testid="stToolbar"] {right:1rem;}
+/* A compact, product-like hero */
+.hero {
+ position:relative; overflow:hidden; display:flex; justify-content:space-between; gap:2rem;
+ background:linear-gradient(112deg,#061D39 0%,#082C54 68%,#0B477C 100%);
+ padding:1.7rem 2rem 1.5rem; border-radius:18px; margin:.2rem 0 1.25rem;
+ box-shadow:0 14px 32px rgba(6,29,57,.13); border-bottom:4px solid var(--orange);
+}
+.hero:before {content:""; position:absolute; right:5%; top:-205px; width:360px; height:360px;
+ border:1px solid rgba(255,255,255,.13); border-radius:50%; box-shadow:0 0 0 28px rgba(255,255,255,.025),0 0 0 58px rgba(255,255,255,.02);}
+.hero-copy {position:relative; z-index:1; max-width:790px;}
+.hero .eyebrow {color:#FFAA70; font-size:.7rem; font-weight:850; letter-spacing:.18em; text-transform:uppercase; margin:0 0 .65rem;}
+.hero h1 {color:#fff; margin:0; padding:0; font-size:clamp(1.8rem,3vw,2.65rem); line-height:1.08; font-weight:850; letter-spacing:-.04em;}
+.hero p {color:#D6E3F2; margin:.7rem 0 0; font-size:.98rem; max-width:720px; line-height:1.55;}
+.hero .formule {display:inline-flex; margin-top:1rem; padding:.55rem .8rem; border-radius:8px;
+ background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.18); color:#fff;
+ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.76rem;}
+.hero-mark {position:relative; z-index:1; min-width:125px; display:flex; flex-direction:column; align-items:flex-end; justify-content:center; text-align:right;}
+.hero-mark .small {font-size:.62rem; letter-spacing:.2em; font-weight:800; color:#A9C4E2;}
+.hero-mark .symbol {font-size:4.6rem; line-height:1; font-weight:900; color:#fff; letter-spacing:-.1em;}
+.hero-mark .symbol span {color:var(--orange);}
+.hero-mark .sub {font-size:.75rem; color:#D6E3F2; margin-top:.4rem;}
+/* Dark, branded navigation rail */
+section[data-testid="stSidebar"] {background:linear-gradient(180deg,#061D39,#082B52); border-right:1px solid #163E66;}
+section[data-testid="stSidebar"] > div {padding-top:1.2rem;}
+section[data-testid="stSidebar"] h3, section[data-testid="stSidebar"] h2 {color:#fff;font-weight:800;}
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {color:#C1D2E5;line-height:1.6;}
+section[data-testid="stSidebar"] hr {border-color:#284969;}
+/* Section containers */
+div[data-testid="stVerticalBlockBorderWrapper"] {background:#fff;border:1px solid var(--line);border-radius:14px;
+ box-shadow:0 5px 18px rgba(6,29,57,.035);padding:.35rem .3rem;}
+div[data-testid="stVerticalBlockBorderWrapper"] h3,
+div[data-testid="stVerticalBlockBorderWrapper"] h4 {color:var(--navy);font-weight:800;letter-spacing:-.02em;}
+h2,h3,h4 {color:var(--navy);}
+p, label {color:var(--ink);}
+[data-testid="stCaptionContainer"] {color:var(--muted);}
+.stSelectbox label,.stFileUploader label,.stTextInput label,.stToggle label {color:var(--ink);font-weight:700;}
+div[data-testid="stFileUploader"] section {background:#F8FAFD;border:1.5px dashed #B8CBE1;border-radius:11px;transition:.18s;}
+div[data-testid="stFileUploader"] section:hover {border-color:var(--orange);background:#FFF8F2;}
+div[data-testid="stFileUploader"] button {border-radius:7px;font-weight:700;}
+.stSelectbox [data-baseweb="select"] > div,.stTextInput input {border-radius:9px;border-color:#CBD8E8;}
+/* Actions */
+.stButton button,.stDownloadButton button {border-radius:9px;font-weight:750;min-height:2.6rem;transition:all .15s ease;}
+.stButton button[kind="primary"],.stDownloadButton button[kind="primary"] {background:var(--orange);border:1px solid var(--orange);color:white;}
+.stButton button[kind="primary"]:hover,.stDownloadButton button[kind="primary"]:hover {background:#E96305;border-color:#E96305;color:white;box-shadow:0 5px 14px rgba(255,117,20,.2);}
+.stButton button:not([kind="primary"]),.stDownloadButton button:not([kind="primary"]) {border-color:#C7D5E5;color:var(--navy);background:#fff;}
+div[data-testid="stMetric"] {background:#fff;border:1px solid var(--line);border-top:3px solid var(--orange);
+ padding:.9rem 1rem;border-radius:11px;box-shadow:0 4px 14px rgba(6,29,57,.035);}
+div[data-testid="stMetricLabel"] {color:var(--muted);font-weight:700;}
+div[data-testid="stMetricValue"] {color:var(--navy);font-weight:850;}
+button[data-baseweb="tab"] {color:#62758D;font-weight:750;}
+button[data-baseweb="tab"][aria-selected="true"] {color:var(--navy);}
+div[data-baseweb="tab-highlight"] {background:var(--orange);}
+div[data-testid="stDataFrame"],div[data-testid="stDataEditor"] {border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+.stAlert {border-radius:10px;} hr {border-color:var(--line);} footer {visibility:hidden;}
+@media(max-width:760px) {
+ .block-container{padding-top:.7rem;}
+ .hero{padding:1.25rem; border-radius:13px;}
+ .hero-mark{display:none;}
+ .hero .formule{font-size:.69rem;white-space:normal;}
+}
 </style>
 """
 
 HERO = (
-    '<div class="hero">'
-    '<div class="hero-main">'
+    '<div class="hero"><div class="hero-copy">'
     '<div class="eyebrow">LEONI · Supply Chain Management</div>'
-    '<h1>Stock, sous contrôle.</h1>'
-    '<p>Une vision fiable des mouvements, des stocks et des écarts. Importez vos fichiers, contrôlez les paramètres, puis lancez une réconciliation traçable.</p>'
-    '<span class="formula">ÉCART = STOCK FINAL − STOCK INITIAL − MOUVEMENTS</span>'
-    '</div>'
-    '<div class="hero-side"><div class="side-kicker">Stock intelligence</div>'
-    '<div class="side-number">S<span>.</span></div>'
-    '<div class="side-label">Réconciliation & contrôle</div></div>'
-    '</div>'
+    '<h1>Réconciliation de stock</h1>'
+    '<p>Contrôlez les mouvements, identifiez les écarts et sécurisez la réconciliation par plant.</p>'
+    '<span class="formule">ÉCART = STOCK FINAL − STOCK INITIAL − MOUVEMENTS</span>'
+    '</div><div class="hero-mark"><div class="small">STOCK INTELLIGENCE</div>'
+    '<div class="symbol">S<span>.</span></div><div class="sub">Réconciliation &amp; contrôle</div>'
+    '</div></div>'
 )
+
 
 
 def _fmt(x: float, decimales: int = 2) -> str:
@@ -945,7 +965,7 @@ def main():
     st.markdown(HERO, unsafe_allow_html=True)
 
     with st.sidebar:
-        st.markdown("### Centre de contrôle")
+        st.markdown("### Mode d'emploi")
         st.markdown(
             "1. Choisissez le **plant**\n"
             "2. Déposez le **stock initial** et le **stock final** (FMALS015)\n"
@@ -962,8 +982,6 @@ def main():
             "Le cache des fichiers analysés expire après 15 minutes (2 entrées maximum par type). "
             "Les résultats restent en mémoire pour permettre l'affichage et le téléchargement."
         )
-
-    st.markdown('<div class="workflow-kicker">01 — CONFIGURER & IMPORTER</div>', unsafe_allow_html=True)
 
     # ---------------------------------------------------------------- 1. PLANT
     with st.container(border=True):
@@ -1075,8 +1093,6 @@ def main():
                     else:
                         st.caption("Aucun magasin coché : aucune ligne ne sera supprimée.")
 
-    st.markdown('<div class="workflow-kicker">02 — VALIDER & EXÉCUTER</div>', unsafe_allow_html=True)
-
     # ---------------------------------------------------------------- LANCEMENT
     manques = []
     if not plant:
@@ -1100,7 +1116,7 @@ def main():
             tuple(sorted(codes)),
         )
 
-    lancer = st.button("LANCER LA RÉCONCILIATION  →", type="primary", disabled=not pret, use_container_width=True)
+    lancer = st.button("🚀 Lancer la réconciliation", type="primary", disabled=not pret)
 
     if lancer and pret:
         try:
