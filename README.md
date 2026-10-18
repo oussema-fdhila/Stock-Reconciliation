@@ -12,6 +12,10 @@ et exporte le résultat dans un fichier Excel.
 
 1. **Plant** : liste déroulante (29, 47, 48, 66, 77). Chaque plant a sa propre table des signes
    (+1 entrée, −1 sortie, 0 neutre).
+   Au choix du plant, un message d'accueil animé s'affiche en haut de la page puis s'évapore
+   (29 : Iheb · 47 : Youssef · 48 : Adnen · 66 : Jawher ; dictionnaire `SALUTATIONS` dans `app.py`).
+   Le plant 77 est partagé : l'utilisateur choisit d'abord **Sami** ou **Nejma** (cartes cliquables) et le message devient
+   « Bonjour Sami ! » ou « Bonjour Nejma ! » (dictionnaire `PERSONNES_PAR_PLANT`).
 2. **Stocks** : dépôt du stock initial et du stock final (rapports FMALS015).
 3. **Mouvements** : dépôt d'**un ou deux** fichiers (rapports FMALS032).
    Le **redressement CW est détecté et appliqué automatiquement**, fichier par fichier :
