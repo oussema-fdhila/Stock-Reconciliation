@@ -937,23 +937,24 @@ div[data-testid="stMetricValue"] {color:var(--navy); font-weight:800; letter-spa
 @keyframes wave {0%,60%,100%{transform:rotate(0)} 10%,30%{transform:rotate(16deg)} 20%,40%{transform:rotate(-10deg)} 50%{transform:rotate(8deg)}}
 [class*="st-key-qui_"] [role="radiogroup"] {gap:.9rem !important; flex-wrap:wrap;}
 [class*="st-key-qui_"] [role="radiogroup"] label {
-  position:relative; cursor:pointer; margin:0 !important; min-width:210px; padding:.8rem 1.4rem .8rem 4rem !important;
+  position:relative; cursor:pointer; margin:0 !important; min-width:210px; padding:.8rem 1.4rem .8rem 3.4rem !important;
   background:#fff; border:1.5px solid #CBD8E8; border-radius:16px; transition:all .22s cubic-bezier(.2,.8,.2,1);
   box-shadow:0 6px 16px rgba(6,29,57,.05); animation:rise .5s both;}
-[class*="st-key-qui_"] [role="radiogroup"] label:nth-child(2) {animation-delay:.1s;}
-[class*="st-key-qui_"] [role="radiogroup"] label > div:first-child {display:none !important;}
+[class*="st-key-qui_"] [role="radiogroup"] label > *:not(:has([data-testid="stMarkdownContainer"])):not(input) {display:none !important;}
 [class*="st-key-qui_"] [role="radiogroup"] label input {position:absolute; opacity:0; pointer-events:none;}
 [class*="st-key-qui_"] [role="radiogroup"] label p {font-size:1.15rem; font-weight:800; color:var(--navy); letter-spacing:-.02em; margin:0;}
+/* pastille : anneau vide -> coche orange quand la personne est choisie */
 [class*="st-key-qui_"] [role="radiogroup"] label:before {
-  content:"S"; position:absolute; left:.8rem; top:50%; width:2.4rem; height:2.4rem; margin-top:-1.2rem; border-radius:50%;
-  display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.1rem; color:#fff;
-  background:linear-gradient(135deg,#0A315D,#0B477C); transition:all .22s;}
-[class*="st-key-qui_"] [role="radiogroup"] label:nth-child(2):before {content:"N";}
+  content:""; position:absolute; left:1rem; top:50%; width:1.7rem; height:1.7rem; margin-top:-.85rem; border-radius:50%;
+  border:2px solid #B8CBE1; background:#fff; transition:all .22s;}
 [class*="st-key-qui_"] [role="radiogroup"] label:hover {transform:translateY(-3px) scale(1.02); border-color:var(--orange); box-shadow:0 14px 28px rgba(255,117,20,.18);}
+[class*="st-key-qui_"] [role="radiogroup"] label:hover:before {border-color:var(--orange);}
 [class*="st-key-qui_"] [role="radiogroup"] label:has(input:checked) {
   background:linear-gradient(135deg,#061D39,#0B477C); border-color:transparent; box-shadow:0 14px 30px rgba(6,29,57,.3), 0 0 0 4px rgba(255,117,20,.25);}
 [class*="st-key-qui_"] [role="radiogroup"] label:has(input:checked) p {color:#fff;}
-[class*="st-key-qui_"] [role="radiogroup"] label:has(input:checked):before {background:linear-gradient(135deg,#FF7514,#FFA25C); box-shadow:0 0 0 0 rgba(255,117,20,.6); animation:pulse 1.8s 2;}
+[class*="st-key-qui_"] [role="radiogroup"] label:has(input:checked):before {
+  content:"✓"; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:1rem;
+  border-color:transparent; background:linear-gradient(135deg,#FF7514,#FFA25C); animation:pulse 1.8s 2;}
 
 /* ---------- Tabs, tables, alerts ---------- */
 div[data-baseweb="tab-list"] {gap:.35rem; background:rgba(255,255,255,.7); padding:.3rem; border-radius:14px; border:1px solid var(--line); width:fit-content;}
