@@ -931,6 +931,30 @@ div[data-testid="stMetric"]:hover {transform:translateY(-3px); box-shadow:0 16px
 div[data-testid="stMetricLabel"] {color:var(--muted); font-weight:700; font-size:.8rem;}
 div[data-testid="stMetricValue"] {color:var(--navy); font-weight:800; letter-spacing:-.03em;}
 
+/* ---------- Choix de la personne (plant partagé) ---------- */
+.qui-title {font-size:.95rem; color:var(--ink); margin:.2rem 0 .1rem;}
+.qui-title span {display:inline-block; animation:wave 1.8s ease-in-out infinite; transform-origin:70% 70%;}
+@keyframes wave {0%,60%,100%{transform:rotate(0)} 10%,30%{transform:rotate(16deg)} 20%,40%{transform:rotate(-10deg)} 50%{transform:rotate(8deg)}}
+[class*="st-key-qui_"] [role="radiogroup"] {gap:.9rem !important; flex-wrap:wrap;}
+[class*="st-key-qui_"] [role="radiogroup"] label {
+  position:relative; cursor:pointer; margin:0 !important; min-width:210px; padding:.8rem 1.4rem .8rem 4rem !important;
+  background:#fff; border:1.5px solid #CBD8E8; border-radius:16px; transition:all .22s cubic-bezier(.2,.8,.2,1);
+  box-shadow:0 6px 16px rgba(6,29,57,.05); animation:rise .5s both;}
+[class*="st-key-qui_"] [role="radiogroup"] label:nth-child(2) {animation-delay:.1s;}
+[class*="st-key-qui_"] [role="radiogroup"] label > div:first-child {display:none !important;}
+[class*="st-key-qui_"] [role="radiogroup"] label input {position:absolute; opacity:0; pointer-events:none;}
+[class*="st-key-qui_"] [role="radiogroup"] label p {font-size:1.15rem; font-weight:800; color:var(--navy); letter-spacing:-.02em; margin:0;}
+[class*="st-key-qui_"] [role="radiogroup"] label:before {
+  content:"S"; position:absolute; left:.8rem; top:50%; width:2.4rem; height:2.4rem; margin-top:-1.2rem; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.1rem; color:#fff;
+  background:linear-gradient(135deg,#0A315D,#0B477C); transition:all .22s;}
+[class*="st-key-qui_"] [role="radiogroup"] label:nth-child(2):before {content:"N";}
+[class*="st-key-qui_"] [role="radiogroup"] label:hover {transform:translateY(-3px) scale(1.02); border-color:var(--orange); box-shadow:0 14px 28px rgba(255,117,20,.18);}
+[class*="st-key-qui_"] [role="radiogroup"] label:has(input:checked) {
+  background:linear-gradient(135deg,#061D39,#0B477C); border-color:transparent; box-shadow:0 14px 30px rgba(6,29,57,.3), 0 0 0 4px rgba(255,117,20,.25);}
+[class*="st-key-qui_"] [role="radiogroup"] label:has(input:checked) p {color:#fff;}
+[class*="st-key-qui_"] [role="radiogroup"] label:has(input:checked):before {background:linear-gradient(135deg,#FF7514,#FFA25C); box-shadow:0 0 0 0 rgba(255,117,20,.6); animation:pulse 1.8s 2;}
+
 /* ---------- Tabs, tables, alerts ---------- */
 div[data-baseweb="tab-list"] {gap:.35rem; background:rgba(255,255,255,.7); padding:.3rem; border-radius:14px; border:1px solid var(--line); width:fit-content;}
 button[data-baseweb="tab"] {color:#62758D; font-weight:750; border-radius:10px; padding:.45rem 1rem; background:transparent;}
@@ -958,14 +982,18 @@ SALUTATIONS = {
     "47": "Youssef",
     "48": "Adnen",
     "66": "Jawher",
-    "77": "Sami & Nejma",
+}
+
+# Plants partagés : l'utilisateur choisit qui il est (le message devient « Bonjour <prénom> ! »)
+PERSONNES_PAR_PLANT = {
+    "77": ["Sami", "Nejma"],
 }
 
 
-def salutation_html(plant: str) -> str:
+def salutation_html(plant: str, personne: str | None = None) -> str:
     """Message 'Bonjour …' : les lettres apparaissent une à une, puis s'évaporent en fumée vers le haut.
     Le nom des animations dépend du plant : changer de plant relance l'effet."""
-    nom = SALUTATIONS.get(plant)
+    nom = personne or SALUTATIONS.get(plant)
     if not nom:
         return ""
     import html as _html
@@ -980,7 +1008,7 @@ def salutation_html(plant: str) -> str:
         lettres.append(
             f'<span class="{cls}" style="--d:{i * 0.055:.2f}s;--dx:{dx}px">{_html.escape(ch)}</span>'
         )
-    k = f"p{plant}"
+    k = "p" + re.sub(r"[^A-Za-z0-9]", "", f"{plant}{nom}")
     return f"""
 <style>
 @keyframes gIn{k}  {{0%{{opacity:0; transform:translateY(-18px) scale(.94); filter:blur(8px)}}
@@ -1224,14 +1252,22 @@ def main():
         plant = st.selectbox(
             "Plant à réconcilier", PLANTS, index=None, placeholder="Choisir un plant…", key="plant"
         )
+        personne = None
+        if plant in PERSONNES_PAR_PLANT:
+            st.markdown('<div class="qui-title"><span>👋</span> Ce plant est partagé — <b>qui êtes-vous ?</b></div>',
+                        unsafe_allow_html=True)
+            personne = st.radio(
+                "Qui êtes-vous ?", PERSONNES_PAR_PLANT[plant], index=None, horizontal=True,
+                label_visibility="collapsed", key=f"qui_{plant}",
+            )
         if plant:
             st.caption("Les signes appliqués aux mouvements se consultent et se modifient à l'étape 4.")
         else:
             st.caption("Le plant détermine la table des signes appliquée aux mouvements.")
 
     # Message d'accueil animé (hors du cadre : position fixe en haut de la page)
-    if plant:
-        st.markdown(salutation_html(plant), unsafe_allow_html=True)
+    if plant and (plant not in PERSONNES_PAR_PLANT or personne):
+        st.markdown(salutation_html(plant, personne), unsafe_allow_html=True)
 
     # ---------------------------------------------------------------- 2. STOCKS
     with st.container(border=True):
