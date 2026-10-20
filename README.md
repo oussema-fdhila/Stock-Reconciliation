@@ -23,6 +23,9 @@ et exporte le résultat dans un fichier Excel.
 4. **Magasins à supprimer** : l'application liste les magasins présents dans les fichiers de
    mouvements (après redressement). On coche ceux à supprimer ; si on ne coche rien, rien n'est supprimé.
    Les zéros à gauche sont ignorés (`010953` = `10953`).
+   **Aperçu avant suppression** : pour les magasins cochés, l'application affiche les valeurs de la colonne
+   « by warehouses » associées (lignes + quantité). Chaque ligne a une case **Effacer** : cochée = supprimée,
+   décochée = conservée. Les exceptions sont tracées dans la feuille `Paramètres`.
 5. **Résultats** : indicateurs, tableau de réconciliation (recherche, filtre « seulement les écarts »),
    plus gros écarts, TCD par fichier, contrôles, et **téléchargement Excel**.
 
