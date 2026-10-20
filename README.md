@@ -27,7 +27,20 @@ et exporte le résultat dans un fichier Excel.
    « by warehouses » associées (lignes + quantité). Chaque ligne a une case **Effacer** : cochée = supprimée,
    décochée = conservée. Les exceptions sont tracées dans la feuille `Paramètres`.
 5. **Résultats** : indicateurs, tableau de réconciliation (recherche, filtre « seulement les écarts »),
-   plus gros écarts, TCD par fichier, contrôles, et **téléchargement Excel**.
+   plus gros écarts, **magasins à écarts**, TCD par fichier, contrôles, et **téléchargement Excel**.
+
+### Onglet « Magasins à écarts »
+
+Classe les magasins selon les écarts des articles qui y ont bougé :
+
+- **Écart € concerné** : écarts (valeur absolue) des articles en écart présents dans le magasin ;
+- **Écart € imputé** : cet écart réparti entre les magasins au prorata de leur volume de mouvement (la somme = écart total) ;
+- **Articles annulés** : articles dont l'écart disparaît si on ignore le mouvement net du magasin (tolérance 2 %) —
+  indice le plus fort que le magasin est la cause ; à vérifier, puis à cocher dans « Magasins à supprimer » ;
+- **Niveau** : 🔴 ≥ 20 % de l'écart total · 🟠 ≥ 8 % · 🟢 sinon.
+
+Un sélecteur affiche le détail article par article d'un magasin. Chaque ligne = un couple **magasin + « by warehouses »**. Les feuilles `Magasins à écarts` et `Détail magasins`
+(50 000 lignes max) sont ajoutées à l'Excel.
 
 ### Contrôles affichés (onglet « Contrôles »)
 
@@ -39,7 +52,7 @@ et exporte le résultat dans un fichier Excel.
 ### Fichier Excel
 
 Feuilles : `Réconcil`, `TCD1` (`TCD2`), `Paramètres` (plant, fichiers, magasins supprimés, date),
-et selon le cas `Mouvements inconnus` et `Hors stock`. Les écarts non nuls sont en rouge.
+`Magasins à écarts`, `Détail magasins` et selon le cas `Mouvements inconnus` et `Hors stock`. Les écarts non nuls sont en rouge.
 
 ## Format des fichiers attendus
 
