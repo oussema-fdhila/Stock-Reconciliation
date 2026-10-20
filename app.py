@@ -674,6 +674,80 @@ def trouver_orphelins(df_rec: pd.DataFrame, tcds: list[pd.DataFrame], noms: list
     return pd.DataFrame(lignes, columns=["Fichier", "PartNumber", "Mouvement"])
 
 
+def paires_magasin_article(df: pd.DataFrame, signes: dict) -> pd.DataFrame:
+    """Mouvement signé net par (PartNumber, magasin) pour un fichier de mouvements (après suppressions)."""
+    if df.empty or "Warehouse" not in df.columns:
+        return pd.DataFrame(columns=["PartNumber", "code", "mvt", "mvt_abs"])
+    bt = df["BookType"].astype(str).str.replace(r"^0+(\d+)$", r"\1", regex=True)
+    mouv = (bt + "_" + df["Type"].astype(str)).str.strip()
+    sg = mouv.map(signes).fillna(SIGNE_PAR_DEFAUT).astype(float)
+    q = en_nombre(df["Quantity"]).fillna(0) * sg
+    code = colonne_warehouse(df).map(normaliser_code_magasin).replace("", "(vide)")
+    t = pd.DataFrame({"PartNumber": df["PartNr."].to_numpy(), "code": code.to_numpy(),
+                      "mvt": q.to_numpy(), "mvt_abs": q.abs().to_numpy()})
+    return t.groupby(["PartNumber", "code"], as_index=False).sum()
+
+
+def analyser_magasins(paires: list, rec: pd.DataFrame, libelles: dict):
+    """
+    Magasins qui concentrent les grands écarts.
+    - « Écart € concerné » : somme des |Écart €| des articles en écart qui ont des mouvements dans le magasin.
+    - « Écart € imputé »   : cet écart réparti entre les magasins au prorata de leur volume de mouvement.
+    - « Écart annulé »     : articles dont l'écart disparaît si on ignore le mouvement net du magasin
+                             (|Écart + mouvement du magasin| ≈ 0) : le magasin est probablement la cause.
+    Retourne (synthèse par magasin, détail magasin × article, nb articles en écart sans mouvement).
+    """
+    vide_s = pd.DataFrame(columns=["Magasin", "Articles en écart", "Écart € concerné", "Écart € imputé",
+                                   "Part de l'écart %", "Articles annulés", "Écart € annulé", "Niveau"])
+    vide_d = pd.DataFrame(columns=["Magasin", "PartNumber", "Mouvement du magasin", "Ecart", "Ecart €",
+                                   "Écart € imputé", "Annule l'écart"])
+    ec = rec[rec["Ecart"].abs() > 1e-9][["PartNumber", "Ecart", "Ecart €"]]
+    if ec.empty or not paires:
+        return vide_s, vide_d, int(len(ec))
+    p = pd.concat(paires, ignore_index=True).groupby(["PartNumber", "code"], as_index=False).sum()
+    d = p.merge(ec, on="PartNumber", how="inner")
+    sans_mouv = int(len(ec) - d["PartNumber"].nunique())
+    if d.empty:
+        return vide_s, vide_d, sans_mouv
+
+    tot_abs = d.groupby("PartNumber")["mvt_abs"].transform("sum")
+    poids = (d["mvt_abs"] / tot_abs.where(tot_abs > 0)).fillna(1.0 / d.groupby("PartNumber")["code"].transform("size"))
+    d["imp_eur"] = d["Ecart €"].abs() * poids
+    d["imp_qte"] = d["Ecart"].abs() * poids
+    tol = d["Ecart"].abs().mul(0.02).clip(lower=1e-6)
+    d["annule"] = (d["mvt"].abs() > 1e-9) & ((d["Ecart"] + d["mvt"]).abs() <= tol)
+    d["Magasin"] = d["code"].map(lambda c: libelles.get(c, c))
+
+    d["eur_abs"] = d["Ecart €"].abs()
+    d["eur_annule"] = d["eur_abs"].where(d["annule"], 0.0)
+    d["n_annule"] = d["annule"].astype(int)
+    syn = d.groupby("Magasin", as_index=False).agg(**{
+        "Articles en écart": ("PartNumber", "size"),
+        "Écart € concerné": ("eur_abs", "sum"),
+        "Écart € imputé": ("imp_eur", "sum"),
+        "Écart qté imputé": ("imp_qte", "sum"),
+        "Articles annulés": ("n_annule", "sum"),
+        "Écart € annulé": ("eur_annule", "sum"),
+    })
+    total = syn["Écart € imputé"].sum()
+    if total <= 0:   # PU nul : on raisonne en quantités
+        total = syn["Écart qté imputé"].sum()
+        part = syn["Écart qté imputé"]
+    else:
+        part = syn["Écart € imputé"]
+    syn["Part de l'écart %"] = (100 * part / total).round(1) if total > 0 else 0.0
+    syn["Niveau"] = pd.cut(syn["Part de l'écart %"], [-1, 8, 20, 101], labels=["🟢 Faible", "🟠 Moyen", "🔴 Élevé"]).astype(str)
+    syn = syn.sort_values(["Écart € annulé", "Écart € imputé", "Écart qté imputé"], ascending=False).reset_index(drop=True)
+    syn = syn.drop(columns=["Écart qté imputé"])
+    syn = syn[["Magasin", "Niveau", "Part de l'écart %", "Articles en écart", "Écart € concerné",
+               "Écart € imputé", "Articles annulés", "Écart € annulé"]]
+
+    det = d.rename(columns={"mvt": "Mouvement du magasin", "imp_eur": "Écart € imputé", "annule": "Annule l'écart"})
+    det = det.sort_values("Écart € imputé", ascending=False).head(50000)
+    det = det[["Magasin", "PartNumber", "Mouvement du magasin", "Ecart", "Ecart €", "Écart € imputé", "Annule l'écart"]]
+    return syn, det.reset_index(drop=True), sans_mouv
+
+
 def calculer(plant: str, df_si, nom_si: str, df_sf, nom_sf: str, mouvs: list[dict], codes: set[str],
              libelles_magasins: dict | None = None, signes: dict | None = None,
              garder: set | None = None) -> dict:
@@ -681,12 +755,13 @@ def calculer(plant: str, df_si, nom_si: str, df_sf, nom_sf: str, mouvs: list[dic
     `signes` : table des signes choisie dans l'application (sinon table par défaut du plant)."""
     signes = dict(signes) if signes is not None else dict(SIGNES_PAR_PLANT[plant])
     modifs = differences_signes(plant, signes)
-    tcds, inconnus_liste, controle = [], [], []
+    tcds, inconnus_liste, controle, paires = [], [], [], []
     csv_redresses = []
 
     for m in mouvs:
         df, nb_sup_mag = supprimer_magasins(m["df"], codes, garder)
         tcd, inconnus = creer_tcd(df, signes, m["nom"])
+        paires.append(paires_magasin_article(df, signes))
         tcds.append(tcd)
         inconnus_liste.append(inconnus)
 
@@ -708,6 +783,7 @@ def calculer(plant: str, df_si, nom_si: str, df_sf, nom_sf: str, mouvs: list[dic
     orphelins = trouver_orphelins(rec, tcds, [m["nom"] for m in mouvs])
 
     libelles = libelles_magasins or {}
+    mag_syn, mag_det, nb_sans_mouv = analyser_magasins(paires, rec, libelles)
     magasins_supprimes = [libelles.get(c, c) for c in sorted(codes)]
 
     params = {
@@ -735,7 +811,7 @@ def calculer(plant: str, df_si, nom_si: str, df_sf, nom_sf: str, mouvs: list[dic
 
     # Construire le fichier Excel une seule fois ; le résultat conserve uniquement
     # les objets nécessaires à l'affichage et aux boutons de téléchargement.
-    excel_bytes = construire_excel(rec, tcds, params, inconnus_all, orphelins)
+    excel_bytes = construire_excel(rec, tcds, params, inconnus_all, orphelins, mag_syn, mag_det)
     resultat = {
         "plant": plant,
         "df": rec,
@@ -745,6 +821,9 @@ def calculer(plant: str, df_si, nom_si: str, df_sf, nom_sf: str, mouvs: list[dic
         "controle": controle_df,
         "orphelins": orphelins,
         "magasins_supprimes": magasins_supprimes,
+        "mag_syn": mag_syn,
+        "mag_det": mag_det,
+        "nb_sans_mouv": nb_sans_mouv,
         "csv_redresses": csv_redresses,
         "params": params,
         "excel": excel_bytes,
@@ -752,7 +831,7 @@ def calculer(plant: str, df_si, nom_si: str, df_sf, nom_sf: str, mouvs: list[dic
     }
 
     # Libérer les objets intermédiaires locaux dès qu'ils ne sont plus nécessaires.
-    del controle, controle_df, excel_bytes, inconnus_liste, libelles, params, rec, orphelins
+    del controle, controle_df, excel_bytes, inconnus_liste, libelles, params, rec, orphelins, paires
     gc.collect()
     return resultat
 
@@ -790,7 +869,7 @@ def _styler_feuille(ws, df: pd.DataFrame, colonnes_nombres: tuple = (), colonnes
             )
 
 
-def construire_excel(rec, tcds, params, inconnus, orphelins) -> bytes:
+def construire_excel(rec, tcds, params, inconnus, orphelins, mag_syn=None, mag_det=None) -> bytes:
     """Classeur : Réconcil, TCD1 (TCD2), Paramètres, + Mouvements inconnus / Hors stock si besoin."""
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
@@ -814,6 +893,14 @@ def construire_excel(rec, tcds, params, inconnus, orphelins) -> bytes:
         if len(orphelins):
             orphelins.to_excel(writer, sheet_name="Hors stock", index=False)
             _styler_feuille(writer.sheets["Hors stock"], orphelins)
+        if mag_syn is not None and len(mag_syn):
+            mag_syn.to_excel(writer, sheet_name="Magasins à écarts", index=False)
+            _styler_feuille(writer.sheets["Magasins à écarts"], mag_syn,
+                            colonnes_nombres=("Écart € concerné", "Écart € imputé", "Écart € annulé"))
+        if mag_det is not None and len(mag_det):
+            mag_det.to_excel(writer, sheet_name="Détail magasins", index=False)
+            _styler_feuille(writer.sheets["Détail magasins"], mag_det,
+                            colonnes_nombres=("Ecart €", "Écart € imputé"))
     return buf.getvalue()
 
 
@@ -1174,8 +1261,8 @@ def afficher_resultats(res: dict):
         type="primary",
     )
 
-    t_rec, t_top, t_tcd, t_ctrl = st.tabs(
-        ["📋 Réconciliation", "📊 Plus gros écarts", "🔀 TCD", "🔍 Contrôles"]
+    t_rec, t_top, t_mag, t_tcd, t_ctrl = st.tabs(
+        ["📋 Réconciliation", "📊 Plus gros écarts", "🏬 Magasins à écarts", "🔀 TCD", "🔍 Contrôles"]
     )
 
     with t_rec:
@@ -1212,6 +1299,56 @@ def afficher_resultats(res: dict):
                 column_config={
                     "PU": st.column_config.NumberColumn("PU", format="%.2f"),
                     "Ecart €": st.column_config.NumberColumn("Ecart €", format="%.2f"),
+                },
+            )
+
+    with t_mag:
+        syn, det = res["mag_syn"], res["mag_det"]
+        if syn.empty:
+            if nb_ecart == 0:
+                st.success("✅ Aucun écart : aucun magasin à surveiller.")
+            else:
+                st.info("Aucun magasin n'est lié aux articles en écart (pas de mouvement sur ces articles).")
+        else:
+            haut = syn.iloc[0]
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Magasins liés aux écarts", _fmt(len(syn), 0))
+            m2.metric("Magasin n°1", str(haut["Magasin"]))
+            part_haut = float(haut["Part de l'écart %"])
+            m3.metric("Part de l'écart (n°1)", f"{part_haut:.1f} %")
+            m4.metric("Écart sans mouvement", _fmt(res["nb_sans_mouv"], 0),
+                      help="Articles en écart qui n'ont aucun mouvement : l'écart ne vient pas d'un magasin.")
+            with st.expander("Comment lire cette analyse ?"):
+                st.markdown(
+                    "- **Écart € concerné** : total des écarts (en valeur absolue) des articles qui ont bougé dans le magasin.\n"
+                    "- **Écart € imputé** : cet écart réparti entre les magasins au prorata de leur volume de mouvement "
+                    "(somme = écart total).\n"
+                    "- **Articles annulés** : articles dont l'écart **disparaît** si on ignore le mouvement net de ce magasin "
+                    "(tolérance 2 %). C'est l'indice le plus fort : ce magasin est probablement la cause — "
+                    "à vérifier, puis à cocher dans « Magasins à supprimer » si besoin.\n"
+                    "- **Niveau** : 🔴 ≥ 20 % de l'écart total · 🟠 ≥ 8 % · 🟢 sinon."
+                )
+            top10 = syn.head(10).set_index("Magasin")["Écart € imputé"]
+            st.bar_chart(top10)
+            st.dataframe(
+                syn, hide_index=True,
+                column_config={
+                    "Part de l'écart %": st.column_config.ProgressColumn(
+                        "Part de l'écart %", min_value=0, max_value=100, format="%.1f %%"),
+                    "Écart € concerné": st.column_config.NumberColumn(format="%.2f"),
+                    "Écart € imputé": st.column_config.NumberColumn(format="%.2f"),
+                    "Écart € annulé": st.column_config.NumberColumn(format="%.2f"),
+                },
+            )
+            choix = st.selectbox("Voir les articles d'un magasin", list(syn["Magasin"]), key="mag_detail")
+            sel = det[det["Magasin"] == choix].drop(columns=["Magasin"])
+            st.caption(f"{len(sel):,} article(s) en écart passant par {choix} (tri : écart imputé décroissant).".replace(",", " "))
+            st.dataframe(
+                sel, hide_index=True,
+                column_config={
+                    "Ecart €": st.column_config.NumberColumn(format="%.2f"),
+                    "Écart € imputé": st.column_config.NumberColumn(format="%.2f"),
+                    "Annule l'écart": st.column_config.CheckboxColumn("Annule l'écart"),
                 },
             )
 
