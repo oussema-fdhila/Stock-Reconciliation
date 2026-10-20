@@ -405,10 +405,15 @@ def _parse_mouvements(contenu: bytes, nom: str) -> dict:
             )
         df, stats = redresser_cw(df)
         csv_redresse = exporter_csv_redresse(df, entete)
+        # Colonne M (« by warehouses ») : conservée sous un nom fixe pour l'aperçu avant suppression.
+        if df.shape[1] > POS_M:
+            df["by warehouses"] = df.iloc[:, POS_M].astype(str).str.strip()
+        else:
+            df["by warehouses"] = ""
         redresse = True
         # Les 25+ colonnes ne sont plus nécessaires aux calculs après le redressement.
         # Garder uniquement les 5 colonnes utilisées par les magasins et le TCD.
-        noms_utiles = ("PartNr.", "BookType", "Warehouse", "Quantity", "Type")
+        noms_utiles = ("PartNr.", "BookType", "Warehouse", "Quantity", "Type", "by warehouses")
         manquantes_utiles = [c for c in noms_utiles if c not in df.columns]
         if manquantes_utiles:
             raise ValueError(f"{nom} : colonnes utiles absentes après CW : {manquantes_utiles}")
@@ -419,15 +424,15 @@ def _parse_mouvements(contenu: bytes, nom: str) -> dict:
         # Sélection par position pour tolérer les espaces dans les en-têtes exportés.
         df, _ = lire_csv_bytes(
             contenu, LIGNES_A_IGNORER_MOUVEMENTS, nom,
-            usecols=[2, 6, 8, 10, 11],
+            usecols=[2, 6, 8, 10, 11, POS_M],
         )
-        if df.shape[1] != 5:
-            raise ValueError(f"{nom} : structure inattendue, 5 colonnes utiles attendues.")
+        if df.shape[1] != 6:
+            raise ValueError(f"{nom} : structure inattendue, 6 colonnes utiles attendues.")
         noms = [str(c).replace("\xa0", " ").replace("\ufeff", "").strip() for c in df.columns]
         df.columns = noms
         # Le rapport peut contenir des espaces en fin de nom (ex. 'BookType ').
         mapping = {}
-        for idx, canonical in zip(range(5), ("PartNr.", "BookType", "Warehouse", "Quantity", "Type")):
+        for idx, canonical in zip(range(6), ("PartNr.", "BookType", "Warehouse", "Quantity", "Type", "by warehouses")):
             mapping[df.columns[idx]] = canonical
         df.rename(columns=mapping, inplace=True)
         manquantes = [c for c in ("PartNr.", "BookType", "Quantity", "Type", "Warehouse") if c not in df.columns]
@@ -435,7 +440,7 @@ def _parse_mouvements(contenu: bytes, nom: str) -> dict:
             raise ValueError(
                 f"{nom} : colonnes utiles introuvables {manquantes}. Vérifier la structure FMALS032."
             )
-        for col in ("PartNr.", "BookType", "Warehouse", "Quantity", "Type"):
+        for col in ("PartNr.", "BookType", "Warehouse", "Quantity", "Type", "by warehouses"):
             df[col] = df[col].astype(str).str.replace("\xa0", " ", regex=False).str.strip()
 
     return {
@@ -478,12 +483,44 @@ def lister_magasins(dfs: list[pd.DataFrame]) -> pd.DataFrame:
     return out.sort_index()
 
 
-def supprimer_magasins(df: pd.DataFrame, codes: set[str]):
-    """Supprime les lignes dont le magasin (normalisé) est dans `codes`. Retourne (df, nb_supprimées)."""
+def _col_by_warehouses(df: pd.DataFrame) -> pd.Series:
+    """Colonne « by warehouses » (vide si absente)."""
+    if "by warehouses" in df.columns:
+        return df["by warehouses"].astype(str).str.strip()
+    return pd.Series("", index=df.index)
+
+
+def supprimer_magasins(df: pd.DataFrame, codes: set[str], garder: set | None = None):
+    """Supprime les lignes dont le magasin (normalisé) est dans `codes`, sauf les couples
+    (magasin, by warehouses) de `garder`. Retourne (df, nb_supprimées)."""
     if not codes:
         return df, 0
-    masque = colonne_warehouse(df).map(normaliser_code_magasin).isin(codes)
+    mag = colonne_warehouse(df).map(normaliser_code_magasin)
+    masque = mag.isin(codes)
+    if garder:
+        couples = pd.MultiIndex.from_arrays([mag, _col_by_warehouses(df)])
+        masque = masque & ~couples.isin(list(garder))
     return df.loc[~masque], int(masque.sum())
+
+
+def apercu_by_warehouses(dfs: list[pd.DataFrame], codes: set[str]) -> pd.DataFrame:
+    """Pour les magasins cochés : valeurs de « by warehouses » associées (lignes + quantité)."""
+    morceaux = []
+    for df in dfs:
+        mag = colonne_warehouse(df).map(normaliser_code_magasin)
+        m = mag.isin(codes)
+        if not m.any():
+            continue
+        morceaux.append(pd.DataFrame({
+            "code": mag[m].to_numpy(),
+            "by": _col_by_warehouses(df)[m].to_numpy(),
+            "qte": en_nombre(df.loc[m, "Quantity"]).fillna(0).to_numpy(),
+        }))
+    if not morceaux:
+        return pd.DataFrame(columns=["code", "by", "Lignes", "Quantité"])
+    t = pd.concat(morceaux, ignore_index=True)
+    out = t.groupby(["code", "by"], as_index=False).agg(Lignes=("qte", "size"), Quantité=("qte", "sum"))
+    return out.sort_values(["code", "Lignes"], ascending=[True, False]).reset_index(drop=True)
 
 
 def creer_tcd(df: pd.DataFrame, signes: dict, nom: str):
@@ -638,7 +675,8 @@ def trouver_orphelins(df_rec: pd.DataFrame, tcds: list[pd.DataFrame], noms: list
 
 
 def calculer(plant: str, df_si, nom_si: str, df_sf, nom_sf: str, mouvs: list[dict], codes: set[str],
-             libelles_magasins: dict | None = None, signes: dict | None = None) -> dict:
+             libelles_magasins: dict | None = None, signes: dict | None = None,
+             garder: set | None = None) -> dict:
     """Calcul complet. Retourne un dictionnaire avec tous les résultats et le fichier Excel.
     `signes` : table des signes choisie dans l'application (sinon table par défaut du plant)."""
     signes = dict(signes) if signes is not None else dict(SIGNES_PAR_PLANT[plant])
@@ -647,7 +685,7 @@ def calculer(plant: str, df_si, nom_si: str, df_sf, nom_sf: str, mouvs: list[dic
     csv_redresses = []
 
     for m in mouvs:
-        df, nb_sup_mag = supprimer_magasins(m["df"], codes)
+        df, nb_sup_mag = supprimer_magasins(m["df"], codes, garder)
         tcd, inconnus = creer_tcd(df, signes, m["nom"])
         tcds.append(tcd)
         inconnus_liste.append(inconnus)
@@ -683,6 +721,10 @@ def calculer(plant: str, df_si, nom_si: str, df_sf, nom_sf: str, mouvs: list[dic
             for m in mouvs
         ),
         "Magasins supprimés": ", ".join(magasins_supprimes) if magasins_supprimes else "aucun",
+        "Lignes conservées malgré le magasin (by warehouses)": (
+            ", ".join(f"{libelles.get(c, c)} / {b or '(vide)'}" for c, b in sorted(garder))
+            if garder else "aucune"
+        ),
         "Mouvements inconnus (signe 0)": int(len(inconnus_all)),
         "Signes modifiés": (
             ", ".join(f"{k}: {a} → {b}" for k, a, b in modifs) if modifs else "aucun (table par défaut)"
@@ -1375,6 +1417,7 @@ def main():
 
     # ---------------------------------------------------------------- 5. MAGASINS
     codes: set[str] = set()
+    garder: set = set()
     libelles: dict = {}
     with st.container(border=True):
         st.markdown("#### 5 · Magasins à supprimer")
@@ -1394,7 +1437,8 @@ def main():
                 else:
                     st.caption(
                         f"{len(tableau)} magasin(s) trouvé(s) dans les mouvements (après redressement CW). "
-                        "Cochez ceux à supprimer ; ne cochez rien pour tout conserver."
+                        "Cochez ceux à supprimer ; ne cochez rien pour tout conserver. "
+                        "Un aperçu de « by warehouses » vous laissera confirmer avant l'effacement."
                     )
                     base = tableau.copy()
                     base.insert(0, "Supprimer", False)
@@ -1414,10 +1458,38 @@ def main():
                     codes = set(cochees)
                     libelles = tableau["Magasin"].to_dict()
                     if codes:
-                        nb_lignes = int(tableau.loc[list(codes), "Lignes"].sum())
+                        apercu = apercu_by_warehouses([m["df"] for m in mouvs], codes)
+                        st.markdown("**Aperçu avant suppression — colonne « by warehouses » liée aux magasins cochés**")
+                        st.caption(
+                            "Pour chaque magasin coché, voici les valeurs de « by warehouses » trouvées. "
+                            "Laissez **Effacer** coché pour supprimer ces lignes ; décochez pour les **conserver**."
+                        )
+                        vue = pd.DataFrame({
+                            "Effacer": True,
+                            "Magasin": [libelles.get(c, c) for c in apercu["code"]],
+                            "by warehouses": [b if b else "(vide)" for b in apercu["by"]],
+                            "Lignes": apercu["Lignes"].astype(int),
+                            "Quantité": apercu["Quantité"],
+                        })
+                        cle_bw = "bw_" + str(hash((cle, tuple(sorted(codes)))))
+                        edite_bw = st.data_editor(
+                            vue, key=cle_bw, hide_index=True,
+                            disabled=["Magasin", "by warehouses", "Lignes", "Quantité"],
+                            column_config={
+                                "Effacer": st.column_config.CheckboxColumn("Effacer", default=True),
+                                "Lignes": st.column_config.NumberColumn("Lignes", format="%d"),
+                                "Quantité": st.column_config.NumberColumn("Quantité", format="%.2f"),
+                            },
+                        )
+                        gardes = edite_bw["Effacer"].to_numpy() == False  # noqa: E712
+                        garder = {
+                            (apercu.loc[i, "code"], apercu.loc[i, "by"]) for i in edite_bw.index[gardes]
+                        }
+                        nb_sup = int(apercu["Lignes"].sum() - apercu.loc[list(edite_bw.index[gardes]), "Lignes"].sum())
+                        nb_gar = int(apercu["Lignes"].sum()) - nb_sup
                         st.info(
-                            f"🗑️ {len(codes)} magasin(s) coché(s) — {_fmt(nb_lignes, 0)} ligne(s) "
-                            "seront supprimées des mouvements."
+                            f"🗑️ {len(codes)} magasin(s) coché(s) — {_fmt(nb_sup, 0)} ligne(s) seront supprimées"
+                            + (f", {_fmt(nb_gar, 0)} ligne(s) conservées (décochées ci-dessus)." if nb_gar else ".")
                         )
                     else:
                         st.caption("Aucun magasin coché : aucune ligne ne sera supprimée.")
@@ -1443,6 +1515,7 @@ def main():
             plant, _fid(f_si), _fid(f_sf),
             tuple(_fid(f) for f in sorted(f_mouv, key=lambda x: x.name)),
             tuple(sorted(codes)),
+            tuple(sorted(garder)),
             tuple(sorted(signes_choisis.items())),
         )
 
@@ -1454,7 +1527,7 @@ def main():
                 df_si = parse_stock(f_si.getvalue(), f_si.name)
                 df_sf = parse_stock(f_sf.getvalue(), f_sf.name)
                 res = calculer(plant, df_si, f_si.name, df_sf, f_sf.name, mouvs, codes, libelles,
-                               signes=signes_choisis)
+                               signes=signes_choisis, garder=garder)
                 # Les DataFrames de stock ne sont plus nécessaires localement :
                 # les résultats requis restent dans res pour l'affichage et l'export.
                 del df_si, df_sf
